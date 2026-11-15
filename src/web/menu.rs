@@ -10,7 +10,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use super::flow::{
     Field, RecipeView, criteria_fields, encode, hidden, menu_fields, parse, recipe_views,
 };
-use super::{AppState, Pairs, render};
+use super::{AppState, Pairs, catalog_errors, render};
 use crate::i18n::{MESSAGES, Messages, interpolate};
 use crate::menu::{MAX_MEALS, TagFilter};
 
@@ -24,6 +24,7 @@ struct TagChoice {
 #[template(path = "plan.html")]
 struct PlanPage {
     t: &'static Messages,
+    catalog_errors: Vec<String>,
     catalog_summary: String,
     meals: usize,
     max_meals: usize,
@@ -32,7 +33,8 @@ struct PlanPage {
 
 /// Criteria form, prefilled from the query string when coming back from a proposal.
 pub(super) async fn plan(State(state): State<AppState>, Query(pairs): Pairs) -> Response {
-    let catalog = &state.catalog;
+    let snapshot = state.live.snapshot();
+    let catalog = &*snapshot.catalog;
     let criteria = parse(&pairs, catalog).menu.criteria;
     let tags = catalog
         .tags
@@ -48,6 +50,7 @@ pub(super) async fn plan(State(state): State<AppState>, Query(pairs): Pairs) -> 
         .collect();
     render(&PlanPage {
         t: &MESSAGES,
+        catalog_errors: catalog_errors(&snapshot),
         catalog_summary: interpolate(
             &MESSAGES.landing.catalog_summary,
             &[("count", &catalog.recipes.len())],
@@ -62,6 +65,7 @@ pub(super) async fn plan(State(state): State<AppState>, Query(pairs): Pairs) -> 
 #[template(path = "menu.html")]
 struct MenuPage {
     t: &'static Messages,
+    catalog_errors: Vec<String>,
     recipes: Vec<RecipeView>,
     fields: Vec<Field>,
     notices: Vec<String>,
@@ -69,7 +73,8 @@ struct MenuPage {
 }
 
 pub(super) async fn proposal(State(state): State<AppState>, Query(pairs): Pairs) -> Response {
-    let catalog = &state.catalog;
+    let snapshot = state.live.snapshot();
+    let catalog = &*snapshot.catalog;
     let query = parse(&pairs, catalog);
     let mut menu = query.menu.clone();
     let removed = menu.update(catalog, query.reject.as_deref(), &mut fastrand::Rng::new());
@@ -100,6 +105,7 @@ pub(super) async fn proposal(State(state): State<AppState>, Query(pairs): Pairs)
 
     render(&MenuPage {
         t: &MESSAGES,
+        catalog_errors: catalog_errors(&snapshot),
         recipes: recipe_views(catalog, &menu.proposed),
         fields: hidden(menu_fields(&menu)),
         notices,

@@ -33,6 +33,14 @@ article.recipe button {
   background: var(--pico-card-background-color);
 }
 
+.catalog-errors {
+  border-inline-start: 0.25rem solid var(--pico-del-color);
+}
+
+.catalog-errors ul {
+  margin-bottom: 0;
+}
+
 @media print {
   header p,
   .actions,

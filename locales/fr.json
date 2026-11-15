@@ -3,6 +3,9 @@
     "title": "On mange quoi\u202f?",
     "tagline": "Les menus de la semaine et la liste de courses, sans prise de tête."
   },
+  "layout": {
+    "catalog_errors": "Le catalogue modifié contient des erreurs\u00a0: la version précédente reste utilisée."
+  },
   "landing": {
     "intro": "Choisir le nombre de repas et les critères\u00a0: l’application propose des menus, vérifie ce qui est déjà en stock, puis prépare la liste de courses.",
     "catalog_summary": "Recettes au catalogue\u00a0: {count}"
@@ -18,7 +21,9 @@
     "validate": "Valider un fichier d’ingrédients, de tags ou de recette par rapport au catalogue, sans le servir (option répétable)",
     "catalog_loaded": "Catalogue chargé (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
     "catalog_valid": "Catalogue valide (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
-    "catalog_invalid": "Catalogue invalide (problèmes\u00a0: {count})"
+    "catalog_invalid": "Catalogue invalide (problèmes\u00a0: {count})",
+    "catalog_reloaded": "Catalogue rechargé (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
+    "catalog_reload_rejected": "Catalogue modifié invalide, version précédente conservée (problèmes\u00a0: {count})"
   },
   "catalog": {
     "problem": "{location}\u00a0: {message}",

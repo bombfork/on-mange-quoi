@@ -13,6 +13,16 @@
         <h1><a href="/" class="contrast">{{ t.app.title }}</a></h1>
         <p>{{ t.app.tagline }}</p>
       </header>
+      {% if !catalog_errors.is_empty() %}
+      <article class="catalog-errors">
+        <p><strong>{{ t.layout.catalog_errors }}</strong></p>
+        <ul>
+          {% for error in catalog_errors %}
+          <li><small>{{ error }}</small></li>
+          {% endfor %}
+        </ul>
+      </article>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </body>

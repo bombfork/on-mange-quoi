@@ -20,8 +20,8 @@ stock with the user, and outputs a shopping list. It is self-hosted on the famil
 network.
 
 Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
-serves the whole main flow: criteria, proposal, rejection, stock check, shopping list. Hot reload
-of the catalog and the in-app editor are not implemented yet.
+serves the whole main flow: criteria, proposal, rejection, stock check, shopping list. The catalog
+is reloaded when its files change. The in-app editor is not implemented yet.
 
 ## Technical decisions
 
@@ -36,7 +36,10 @@ of the catalog and the in-app editor are not implemented yet.
 - The YAML files are the source of truth. The server keeps the last valid catalog in memory and
   reloads it when the files change, without a restart unless the data format itself changes.
   If a change makes the catalog invalid, the previous catalog stays in use and the error is shown.
-  At startup, an invalid catalog stops the server with the errors.
+  At startup, an invalid catalog stops the server with the errors. Changes are detected by
+  polling a fingerprint of the files every second (no file system notifications, so it also
+  works on network file systems and ConfigMap volumes); a change is applied once stable for one
+  interval, so a burst of writes triggers a single reload.
 - The in-app editor writes the YAML files back atomically and refuses to overwrite a file that
   changed since it was read. Written files are normalized: comments and hand formatting are lost.
   If the data directory is read-only, the editor is disabled.
@@ -73,13 +76,17 @@ Always use mise tasks, not `cargo` directly.
   either `--validate` or serve, with graceful shutdown on Ctrl-C/SIGTERM.
 - `src/catalog/` - domain module, no HTTP/template/i18n dependency:
   - `mod.rs` - `Catalog`, `Problem`/`ProblemKind`, reading the layout, `load()` and `load_with()`
-    (extra files from `--validate` added on top or replacing catalog files);
+    (extra files from `--validate` added on top or replacing catalog files), `fingerprint()`
+    (hash of the files `load()` reads);
   - `files.rs` - serde types of the three file types, parsed with serde-saphyr (`serde_yaml` is
     archived). `Spanned` gives the line and column of every name for error messages. Also file
     kind detection and the schema generation test;
   - `normalize.rs` - name normalization and closest-name suggestion;
   - `validate.rs` - cross-file rules (uniqueness, references, removed names still in use);
   - `tests.rs` - one test per rule, on temporary catalog directories.
+- `src/live.rs` - `LiveCatalog`: the served `Snapshot` (catalog plus the problems of the files
+  on disk), swapped as a whole under a lock; `spawn_watcher` polls `catalog::fingerprint` in a
+  thread and reloads after each settled change.
 - `src/report.rs` - renders problems in French as `path:line:column : message`. Structural errors
   (unknown key, wrong type) embed the parser's English message.
 - `src/menu.rs` - domain module for steps 1 to 3 of the main flow: `Criteria` (meal count, tag
@@ -88,8 +95,9 @@ Always use mise tasks, not `cargo` directly.
   random source (`fastrand::Rng`) is a parameter, seeded in tests.
 - `src/shopping.rs` - domain module for steps 4 and 5: ingredients to check (union of the menu's
   ingredients, without staples, in catalog order) and the shopping list.
-- `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. The loaded catalog
-  is shared through the router state.
+- `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. Each request takes a
+  snapshot of the `LiveCatalog` from the router state; every page struct has `catalog_errors`,
+  shown as a banner by `base.html`.
 - `src/web/flow.rs` - the flow state as carried by query strings, shared by every page:
   `meals`, `tag:<name>=required|excluded`, repeated `proposed`, `rejected` and `in_stock`,
   `with_menu=0|1` (a hidden `0` precedes the checkbox, the last value wins).

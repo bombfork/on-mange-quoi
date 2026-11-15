@@ -17,6 +17,7 @@ pub static MESSAGES: LazyLock<Messages> = LazyLock::new(|| {
 #[serde(deny_unknown_fields)]
 pub struct Messages {
     pub app: AppMessages,
+    pub layout: LayoutMessages,
     pub landing: LandingMessages,
     pub cli: CliMessages,
     pub catalog: CatalogMessages,
@@ -32,6 +33,12 @@ pub struct Messages {
 pub struct AppMessages {
     pub title: String,
     pub tagline: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LayoutMessages {
+    pub catalog_errors: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,6 +62,8 @@ pub struct CliMessages {
     pub catalog_loaded: String,
     pub catalog_valid: String,
     pub catalog_invalid: String,
+    pub catalog_reloaded: String,
+    pub catalog_reload_rejected: String,
 }
 
 #[derive(Debug, Deserialize)]

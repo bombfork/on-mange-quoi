@@ -13,7 +13,8 @@ use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 
-use crate::catalog::Catalog;
+use crate::live::{LiveCatalog, Snapshot};
+use crate::report;
 
 const PICO_CSS: &str = include_str!("../../assets/pico.min.css");
 const MAIN_CSS: &str = include_str!("../../assets/main.css");
@@ -23,10 +24,10 @@ type Pairs = Query<Vec<(String, String)>>;
 
 #[derive(Clone)]
 struct AppState {
-    catalog: Arc<Catalog>,
+    live: Arc<LiveCatalog>,
 }
 
-pub fn router(catalog: Arc<Catalog>) -> Router {
+pub fn router(live: Arc<LiveCatalog>) -> Router {
     Router::new()
         .route("/", get(menu::plan))
         .route("/menu", get(menu::proposal))
@@ -35,11 +36,17 @@ pub fn router(catalog: Arc<Catalog>) -> Router {
         .route("/shopping-list.txt", get(shopping::shopping_list_text))
         .route("/assets/pico.min.css", get(|| async { css(PICO_CSS) }))
         .route("/assets/main.css", get(|| async { css(MAIN_CSS) }))
-        .with_state(AppState { catalog })
+        .with_state(AppState { live })
 }
 
 fn css(body: &'static str) -> impl IntoResponse {
     ([(header::CONTENT_TYPE, "text/css; charset=utf-8")], body)
+}
+
+/// Problems of the catalog files on disk, shown on every page while the previous catalog is
+/// still in use.
+fn catalog_errors(snapshot: &Snapshot) -> Vec<String> {
+    snapshot.problems.iter().map(report::describe).collect()
 }
 
 fn render(page: &impl Template) -> Response {
@@ -54,6 +61,7 @@ fn render(page: &impl Template) -> Response {
 
 #[cfg(test)]
 mod test_support {
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use axum::body::Body;
@@ -63,9 +71,14 @@ mod test_support {
     use tower::ServiceExt;
 
     use crate::catalog::Catalog;
+    use crate::live::LiveCatalog;
 
     pub async fn get(catalog: Catalog, uri: &str) -> Response {
-        super::router(Arc::new(catalog))
+        get_live(Arc::new(LiveCatalog::new(PathBuf::new(), catalog)), uri).await
+    }
+
+    pub async fn get_live(live: Arc<LiveCatalog>, uri: &str) -> Response {
+        super::router(live)
             .oneshot(Request::get(uri).body(Body::empty()).unwrap())
             .await
             .unwrap()
@@ -79,8 +92,39 @@ mod test_support {
 
 #[cfg(test)]
 mod tests {
-    use super::test_support::get;
+    use std::fs;
+
+    use tempfile::TempDir;
+
+    use super::test_support::{body_text, get, get_live};
     use super::*;
+    use crate::catalog::{self, Catalog};
+    use crate::i18n::MESSAGES;
+
+    #[tokio::test]
+    async fn catalog_errors_are_shown_while_the_previous_catalog_is_served() {
+        let dir = TempDir::new().unwrap();
+        let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/catalog");
+        let live = Arc::new(LiveCatalog::new(
+            dir.path().to_path_buf(),
+            catalog::load(&example).unwrap(),
+        ));
+
+        // The temporary directory is empty: reloading it fails.
+        live.reload();
+        let body = body_text(get_live(Arc::clone(&live), "/").await).await;
+        assert!(body.contains(&MESSAGES.layout.catalog_errors));
+        assert!(body.contains(&MESSAGES.catalog.missing));
+        assert!(body.contains("Recettes au catalogue\u{a0}: 6"));
+
+        fs::write(dir.path().join("ingredients.yml"), "ingredients: [pain]\n").unwrap();
+        fs::write(dir.path().join("tags.yml"), "tags: []\n").unwrap();
+        fs::create_dir(dir.path().join("recipes")).unwrap();
+        live.reload();
+        let body = body_text(get_live(live, "/").await).await;
+        assert!(!body.contains(&MESSAGES.layout.catalog_errors));
+        assert!(body.contains("Recettes au catalogue\u{a0}: 0"));
+    }
 
     #[tokio::test]
     async fn stylesheets_are_served_as_css() {

@@ -13,6 +13,7 @@ mod tests;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -163,26 +164,15 @@ fn read_dir(dir: &Path, problems: &mut Vec<Problem>) -> Sources {
     };
 
     let recipes_dir = dir.join(RECIPES_DIR);
-    let entries = match fs::read_dir(&recipes_dir) {
-        Ok(entries) => entries,
+    let paths = match recipe_paths(&recipes_dir) {
+        Ok(paths) => paths,
         Err(error) => {
             problems.push(io_problem(&recipes_dir, &error));
             return sources;
         }
     };
-    let mut paths: Vec<PathBuf> = entries
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .collect();
-    paths.sort();
 
     for path in paths {
-        let hidden = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with('.'));
-        if hidden {
-            continue;
-        }
         let is_yml = path.extension().and_then(|ext| ext.to_str()) == Some(EXTENSION);
         if !path.is_file() || !is_yml {
             problems.push(Problem::new(&path, None, ProblemKind::UnexpectedFile));
@@ -194,6 +184,41 @@ fn read_dir(dir: &Path, problems: &mut Vec<Problem>) -> Sources {
         }
     }
     sources
+}
+
+/// Entries of the recipes directory, sorted, without hidden files (editor swap files, etc.).
+fn recipe_paths(recipes_dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let mut paths: Vec<PathBuf> = fs::read_dir(recipes_dir)?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            !path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with('.'))
+        })
+        .collect();
+    paths.sort();
+    Ok(paths)
+}
+
+/// Hash of every file [`load`] reads, to detect changes without parsing. Equal fingerprints
+/// mean [`load`] would give the same result.
+pub fn fingerprint(dir: &Path) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    let mut hash_file = |path: &Path| {
+        path.file_name().hash(&mut hasher);
+        match fs::read(path) {
+            Ok(content) => content.hash(&mut hasher),
+            Err(error) => error.kind().hash(&mut hasher),
+        }
+    };
+    hash_file(&dir.join(INGREDIENTS_FILE));
+    hash_file(&dir.join(TAGS_FILE));
+    match recipe_paths(&dir.join(RECIPES_DIR)) {
+        Ok(paths) => paths.iter().for_each(|path| hash_file(path)),
+        Err(error) => error.kind().hash(&mut hasher),
+    }
+    hasher.finish()
 }
 
 fn overlay(sources: &mut Sources, paths: &[PathBuf], problems: &mut Vec<Problem>) {

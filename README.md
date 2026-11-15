@@ -6,8 +6,8 @@ the shopping list.
 
 The user interface is in French. The code and documentation are in English.
 
-> **Status:** early development. The whole flow works, from criteria to shopping list; hot reload
-> of the catalog and the in-app editor are still to come.
+> **Status:** early development. The whole flow works, from criteria to shopping list; the in-app
+> catalog editor is still to come.
 
 ## How it is meant to work
 
@@ -47,6 +47,10 @@ catalog/
 
 See [`examples/catalog`](examples/catalog) for a complete example. The server refuses to start
 when the catalog is invalid, and lists every problem.
+
+Changes to the catalog files are picked up within a couple of seconds, without a restart. If the
+modified files are invalid, the previous catalog stays in use and every page shows the errors
+until they are fixed.
 
 To check new or modified files against a catalog without serving it:
 

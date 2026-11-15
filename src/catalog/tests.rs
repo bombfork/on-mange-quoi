@@ -427,3 +427,26 @@ fn missing_extra_file_is_reported() {
         [ProblemKind::Missing]
     );
 }
+
+#[test]
+fn fingerprint_follows_the_files_load_reads() {
+    let dir = catalog_dir(&[]);
+    let base = fingerprint(dir.path());
+    assert_eq!(fingerprint(dir.path()), base);
+
+    write(dir.path(), "recipes/.recette.yml.swp", "ignored");
+    assert_eq!(fingerprint(dir.path()), base, "hidden files are ignored");
+
+    write(
+        dir.path(),
+        "tags.yml",
+        "tags: [enfants, rapide, végétarien]\n",
+    );
+    let edited = fingerprint(dir.path());
+    assert_ne!(edited, base);
+
+    let added = write(dir.path(), "recipes/autre.yml", RECIPE);
+    assert_ne!(fingerprint(dir.path()), edited);
+    fs::remove_file(added).unwrap();
+    assert_eq!(fingerprint(dir.path()), edited);
+}

@@ -2,12 +2,14 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, bail};
 use clap::Parser;
 
 use on_mange_quoi::catalog::{self, Catalog, Problem};
 use on_mange_quoi::i18n::{MESSAGES, interpolate};
+use on_mange_quoi::live::{self, LiveCatalog, Snapshot};
 use on_mange_quoi::{report, web};
 
 #[derive(Debug, Parser)]
@@ -56,6 +58,7 @@ fn validate(cli: &Cli) -> anyhow::Result<()> {
 }
 
 async fn serve(cli: Cli) -> anyhow::Result<()> {
+    let fingerprint = catalog::fingerprint(&cli.catalog);
     let catalog = load_catalog(&cli.catalog, &[])?;
     println!("{}", summary(&MESSAGES.cli.catalog_loaded, &catalog));
 
@@ -72,10 +75,36 @@ async fn serve(cli: Cli) -> anyhow::Result<()> {
         )
     );
 
-    axum::serve(listener, web::router(Arc::new(catalog)))
+    let live = Arc::new(LiveCatalog::new(cli.catalog.clone(), catalog));
+    live::spawn_watcher(Arc::clone(&live), fingerprint, RELOAD_INTERVAL, log_reload);
+
+    axum::serve(listener, web::router(live))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
+}
+
+/// How often the catalog directory is checked for changes.
+const RELOAD_INTERVAL: Duration = Duration::from_secs(1);
+
+fn log_reload(snapshot: &Snapshot) {
+    if snapshot.problems.is_empty() {
+        println!(
+            "{}",
+            summary(&MESSAGES.cli.catalog_reloaded, &snapshot.catalog)
+        );
+        return;
+    }
+    for problem in snapshot.problems.iter() {
+        eprintln!("{}", report::describe(problem));
+    }
+    eprintln!(
+        "{}",
+        interpolate(
+            &MESSAGES.cli.catalog_reload_rejected,
+            &[("count", &snapshot.problems.len())],
+        )
+    );
 }
 
 /// Loads the catalog with `extra_files` on top; on failure, prints every problem.
