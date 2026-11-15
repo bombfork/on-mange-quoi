@@ -104,3 +104,47 @@ async fn removing_from_the_stock_is_a_link() {
     assert!(body.contains(r#"href="/cook?have=jambon""#));
     assert!(body.contains(r#"href="/cook?have=coquillettes""#));
 }
+
+#[tokio::test]
+async fn refine_offers_the_ingredient_tags_of_the_candidates() {
+    let body = page("/cook?tag:viande=required").await;
+    let refine = &body[body.find(&MESSAGES.cook.refine).unwrap()..];
+    for tag in ["charcuterie", "viande blanche", "légumes"] {
+        assert!(refine.contains(&format!(">{tag}</a>")), "{tag}");
+    }
+    assert_eq!(
+        button(refine, "charcuterie").1,
+        "/cook?tag%3Aviande=required&refine=charcuterie"
+    );
+
+    // A vegetarian choice offers no meat tag, and drops a meat refinement.
+    let body = page("/cook?tag:v%C3%A9g%C3%A9tarien=required&refine=charcuterie").await;
+    let refine = &body[body.find(&MESSAGES.cook.refine).unwrap()..];
+    assert!(!refine.contains(">charcuterie</a>"));
+    assert!(button(refine, &MESSAGES.cook.any).0);
+}
+
+#[tokio::test]
+async fn a_chosen_ingredient_tag_narrows_recipes_and_offers_its_ingredients() {
+    let body = page(
+        "/cook?tag:viande=required&refine=charcuterie&have=coquillettes&have=jambon&have=beurre",
+    )
+    .await;
+    assert!(button(&body, "charcuterie").0);
+    assert!(body.contains("Coquillettes au jambon mouliné"));
+    assert!(!body.contains("Poulet rôti"), "no charcuterie in it");
+    // One click adds lardons; jambon is already in stock.
+    assert!(body.contains(">+ lardons</a>"));
+    assert!(!body.contains(">+ jambon</a>"));
+    assert!(body.contains("have=beurre&#38;have=lardons"));
+}
+
+#[tokio::test]
+async fn without_a_tag_the_most_used_ingredients_are_offered() {
+    let body = page("/cook").await;
+    let quick = &body[body.find(&MESSAGES.cook.quick).unwrap()..];
+    // beurre is in three recipes, more than any other non-staple ingredient.
+    let first = quick.find(">+ ").unwrap();
+    assert!(quick[first..].starts_with(">+ beurre</a>"));
+    assert!(!quick.contains(">+ sel</a>"), "no staples");
+}

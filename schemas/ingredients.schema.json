@@ -3,6 +3,22 @@
   "title": "IngredientsFile",
   "type": "object",
   "properties": {
+    "ingredient_tags": {
+      "description": "Ingredient tags: each tag name with the catalog ingredients it applies to.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      }
+    },
     "ingredients": {
       "type": [
         "array",

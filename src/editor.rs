@@ -14,8 +14,10 @@ use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use crate::catalog::normalize::fold;
-use crate::catalog::{self, Catalog, INGREDIENTS_FILE, Problem, RECIPES_DIR, Recipe, TAGS_FILE};
+use crate::catalog::normalize::{fold, normalize};
+use crate::catalog::{
+    self, Catalog, INGREDIENTS_FILE, IngredientTag, Problem, RECIPES_DIR, Recipe, TAGS_FILE,
+};
 
 #[derive(Debug)]
 pub enum EditError {
@@ -147,19 +149,25 @@ impl Editor {
             &[(&path, version)],
             vec![Change {
                 path: path.clone(),
-                content: Some(ingredients_yaml(&ingredients, &staples)),
+                content: Some(ingredients_yaml(
+                    &ingredients,
+                    &staples,
+                    &catalog.ingredient_tags,
+                )),
             }],
         )
     }
 
-    /// Renames an ingredient and/or changes whether it is a pantry staple. A renamed
-    /// ingredient is renamed in every recipe that uses it too.
+    /// Renames an ingredient, changes whether it is a pantry staple, and sets its ingredient
+    /// tags (existing or new ones). A renamed ingredient is renamed in every recipe that uses
+    /// it too.
     pub fn update_ingredient(
         &self,
         version: &str,
         old: &str,
         new: &str,
         staple: bool,
+        tags: &[String],
     ) -> Result<(), EditError> {
         let _guard = self.lock();
         let catalog = self.catalog()?;
@@ -188,10 +196,11 @@ impl Editor {
             };
             list.push(new.to_string());
         }
+        let ingredient_tags = set_ingredient_tags(&catalog.ingredient_tags, old, new, tags);
         let path = PathBuf::from(INGREDIENTS_FILE);
         let mut changes = vec![Change {
             path: path.clone(),
-            content: Some(ingredients_yaml(&ingredients, &staples)),
+            content: Some(ingredients_yaml(&ingredients, &staples, &ingredient_tags)),
         }];
         if old != new {
             changes.extend(rename_in_recipes(&catalog, old, new, |recipe| {
@@ -218,12 +227,13 @@ impl Editor {
         let (mut ingredients, mut staples) = ingredient_lists(&catalog);
         ingredients.retain(|n| n != name);
         staples.retain(|n| n != name);
+        let ingredient_tags = set_ingredient_tags(&catalog.ingredient_tags, name, name, &[]);
         let path = PathBuf::from(INGREDIENTS_FILE);
         self.apply(
             &[(&path, version)],
             vec![Change {
                 path: path.clone(),
-                content: Some(ingredients_yaml(&ingredients, &staples)),
+                content: Some(ingredients_yaml(&ingredients, &staples, &ingredient_tags)),
             }],
         )
     }
@@ -430,7 +440,11 @@ fn recipe_changes(catalog: &Catalog, id: &str, input: &RecipeInput) -> Vec<Chang
     if ingredients.len() + staples.len() > known {
         changes.push(Change {
             path: PathBuf::from(INGREDIENTS_FILE),
-            content: Some(ingredients_yaml(&ingredients, &staples)),
+            content: Some(ingredients_yaml(
+                &ingredients,
+                &staples,
+                &catalog.ingredient_tags,
+            )),
         });
     }
     changes
@@ -482,6 +496,51 @@ fn rename_in_recipes(
             })
         })
         .collect()
+}
+
+/// Ingredient tags after renaming `old` to `new` and giving it exactly the tags `chosen`:
+/// existing tag names (or spelling variants of them), or new tags, added at the end. Tags left
+/// without ingredients are dropped.
+pub fn set_ingredient_tags(
+    tags: &[IngredientTag],
+    old: &str,
+    new: &str,
+    chosen: &[String],
+) -> Vec<IngredientTag> {
+    let mut tags: Vec<IngredientTag> = tags.to_vec();
+    let mut wanted: Vec<String> = Vec::new();
+    for name in chosen
+        .iter()
+        .map(|name| name.trim())
+        .filter(|name| !name.is_empty())
+    {
+        let key = normalize(name);
+        let name = tags
+            .iter()
+            .find(|tag| tag.name == name || normalize(&tag.name) == key)
+            .map_or(name, |tag| tag.name.as_str())
+            .to_string();
+        if !wanted.contains(&name) {
+            wanted.push(name);
+        }
+    }
+    for tag in &mut tags {
+        tag.ingredients
+            .retain(|ingredient| ingredient != old && ingredient != new);
+        if wanted.contains(&tag.name) {
+            tag.ingredients.push(new.to_string());
+        }
+    }
+    for name in wanted {
+        if !tags.iter().any(|tag| tag.name == name) {
+            tags.push(IngredientTag {
+                name,
+                ingredients: vec![new.to_string()],
+            });
+        }
+    }
+    tags.retain(|tag| !tag.ingredients.is_empty());
+    tags
 }
 
 /// Ingredient names split into regular ingredients and pantry staples, in catalog order.
@@ -536,13 +595,27 @@ pub fn recipe_yaml(input: &RecipeInput) -> String {
     yaml
 }
 
-pub fn ingredients_yaml(ingredients: &[String], staples: &[String]) -> String {
+pub fn ingredients_yaml(
+    ingredients: &[String],
+    staples: &[String],
+    tags: &[IngredientTag],
+) -> String {
     let mut yaml = String::new();
     if ingredients.is_empty() {
         yaml.push_str("ingredients: []\n");
     }
     write_list(&mut yaml, "", "ingredients", ingredients);
     write_list(&mut yaml, "", "staples", staples);
+    if !tags.is_empty() {
+        yaml.push_str("ingredient_tags:\n");
+        for tag in tags {
+            if tag.ingredients.is_empty() {
+                let _ = writeln!(yaml, "  {}: []", scalar(&tag.name));
+            } else {
+                write_list(&mut yaml, "  ", &scalar(&tag.name), &tag.ingredients);
+            }
+        }
+    }
     yaml
 }
 

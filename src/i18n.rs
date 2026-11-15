@@ -60,8 +60,10 @@ pub struct CookMessages {
     pub any: String,
     pub other_criteria: String,
     pub apply: String,
+    pub refine: String,
     pub stock_heading: String,
     pub stock_help: String,
+    pub quick: String,
     pub search: String,
     pub add: String,
     pub remove: String,
@@ -129,6 +131,9 @@ pub struct EditorMessages {
     pub import_line: String,
     pub import_unknown_key: String,
     pub import_mixed: String,
+    pub ingredient_tags: String,
+    pub new_ingredient_tag: String,
+    pub new_ingredient_tag_example: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -225,6 +230,8 @@ pub struct CatalogMessages {
     pub no_ingredients: String,
     pub duplicate_ingredient: String,
     pub duplicate_tag: String,
+    pub duplicate_ingredient_tag: String,
+    pub repeated_in_ingredient_tag: String,
     pub empty_choice: String,
     pub repeated_choice: String,
     pub duplicate_recipe_name: String,

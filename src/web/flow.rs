@@ -2,8 +2,8 @@
 //!
 //! Keys: `meals`, `tag:<name>=required|excluded`, repeated `proposed` and `rejected` recipe
 //! identifiers, repeated `in_stock` ingredient names, `with_menu=0|1`, repeated `have`
-//! ingredient names ("Que cuisiner ?" stock); plus the actions `reject=<id>` and `add=<name>`,
-//! and the notice `removed=<count>`.
+//! ingredient names and `refine=<ingredient tag>` ("Que cuisiner ?"); plus the actions
+//! `reject=<id>` and `add=<name>`, and the notice `removed=<count>`.
 
 use crate::catalog::Catalog;
 use crate::menu::{Criteria, MAX_MEALS, Menu, TagFilter};
@@ -21,6 +21,8 @@ pub(super) struct FlowQuery {
     pub with_menu: Option<bool>,
     pub have: Vec<String>,
     pub add: Option<String>,
+    /// Ingredient tag chosen to narrow "Que cuisiner ?".
+    pub refine: Option<String>,
 }
 
 /// Lenient on purpose: invalid values fall back to defaults and unknown tags are ignored.
@@ -40,6 +42,7 @@ pub(super) fn parse(pairs: &[(String, String)], catalog: &Catalog) -> FlowQuery 
             "in_stock" => query.in_stock.push(value.clone()),
             "have" => query.have.push(value.clone()),
             "add" => query.add = Some(value.clone()),
+            "refine" => query.refine = Some(value.clone()),
             // A hidden `0` precedes the checkbox `1`, so the last value is the user's choice.
             "with_menu" => query.with_menu = Some(value == "1"),
             _ => {
@@ -88,9 +91,12 @@ pub(super) fn menu_fields(menu: &Menu) -> Fields {
     fields
 }
 
-/// "Que cuisiner ?" state: tag filters and stock.
-pub(super) fn cook_fields(criteria: &Criteria, have: &[String]) -> Fields {
+/// "Que cuisiner ?" state: tag filters, chosen ingredient tag and stock.
+pub(super) fn cook_fields(criteria: &Criteria, refine: Option<&str>, have: &[String]) -> Fields {
     let mut fields = tag_fields(criteria);
+    if let Some(tag) = refine {
+        fields.push(("refine".to_string(), tag.to_string()));
+    }
     fields.extend(repeated("have", have));
     fields
 }

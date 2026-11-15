@@ -32,6 +32,8 @@ pub struct Catalog {
     pub tags: Vec<String>,
     /// Groups of tags, each one offered as a single choice ("cru" or "cuit").
     pub choices: Vec<Vec<String>>,
+    /// In file order.
+    pub ingredient_tags: Vec<IngredientTag>,
     pub recipes: Vec<Recipe>,
 }
 
@@ -40,6 +42,13 @@ pub struct Ingredient {
     pub name: String,
     /// Pantry staple: always in stock, never asked about in the stock check.
     pub staple: bool,
+}
+
+/// A tag on ingredients ("viande rouge"), separate from recipe tags.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IngredientTag {
+    pub name: String,
+    pub ingredients: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -107,6 +116,16 @@ pub enum ProblemKind {
         name: String,
         other: String,
         line: u64,
+    },
+    DuplicateIngredientTag {
+        name: String,
+        other: String,
+        line: u64,
+    },
+    /// An ingredient listed twice under the same ingredient tag.
+    RepeatedInIngredientTag {
+        tag: String,
+        name: String,
     },
     /// A group of `choices` without any tag.
     EmptyChoice,
@@ -269,6 +288,7 @@ fn overlay(sources: &mut Sources, paths: &[PathBuf], problems: &mut Vec<Problem>
                     let IngredientsFile {
                         ingredients,
                         staples,
+                        ..
                     } = old.file;
                     sources.replaced_ingredients = values([ingredients, staples]);
                 }

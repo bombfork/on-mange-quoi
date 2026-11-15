@@ -16,6 +16,16 @@
   </label>
   {% if with_staple %}
   <label><input type="checkbox" name="staple" value="1"{% if staple %} checked{% endif %} /> {{ t.editor.staple }}</label>
+  <fieldset class="choices">
+    <legend>{{ t.editor.ingredient_tags }}</legend>
+    {% for tag in ingredient_tags %}
+    <label><input type="checkbox" name="ingredient_tag" value="{{ tag.name }}"{% if tag.checked %} checked{% endif %} /> {{ tag.name }}</label>
+    {% endfor %}
+  </fieldset>
+  <label>
+    {{ t.editor.new_ingredient_tag }}
+    <input type="text" name="new_tag" placeholder="{{ t.editor.new_ingredient_tag_example }}" />
+  </label>
   {% endif %}
   <button type="submit">{{ t.editor.save }}</button>
 </form>

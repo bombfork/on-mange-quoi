@@ -54,6 +54,7 @@ mod tests {
         };
         Catalog {
             choices: Vec::new(),
+            ingredient_tags: Vec::new(),
             ingredients: vec![
                 ingredient("lait", false),
                 ingredient("œufs", false),

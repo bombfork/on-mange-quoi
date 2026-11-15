@@ -22,3 +22,17 @@ staples:
   - sel
   - poivre
   - huile
+ingredient_tags:
+  charcuterie:
+    - jambon
+    - lardons
+  viande blanche:
+    - poulet
+  légumes:
+    - champignons
+    - courgettes
+    - aubergines
+    - poivrons
+    - tomates
+    - oignons
+    - pommes de terre

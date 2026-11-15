@@ -485,3 +485,37 @@ async fn refused_import_keeps_the_text_and_locates_errors() {
     );
     assert!(!dir.path().join("recipes/pain-perdu.yml").exists());
 }
+
+#[tokio::test]
+async fn ingredient_tags_are_edited_on_the_ingredient_page() {
+    let (_dir, live) = served_copy();
+    let body = page(&live, "/catalog/ingredients/edit?name=poulet").await;
+    assert!(body.contains(r#"name="ingredient_tag" value="viande blanche" checked"#));
+    assert!(body.contains(r#"name="ingredient_tag" value="charcuterie" />"#));
+
+    let response = post_form(
+        Arc::clone(&live),
+        "/catalog/ingredients/edit",
+        &form(&[
+            ("version", &version(&body)),
+            ("name", "poulet"),
+            ("new_name", "poulet"),
+            ("ingredient_tag", "viande blanche"),
+            ("new_tag", "volaille"),
+        ]),
+    )
+    .await;
+    assert_eq!(location(&response), "/catalog/ingredients?notice=updated");
+    let tags: Vec<String> = live
+        .snapshot()
+        .catalog
+        .ingredient_tags
+        .iter()
+        .filter(|tag| tag.ingredients.iter().any(|i| i == "poulet"))
+        .map(|tag| tag.name.clone())
+        .collect();
+    assert_eq!(tags, ["viande blanche", "volaille"]);
+
+    let body = page(&live, "/catalog/ingredients").await;
+    assert!(body.contains("<mark>viande blanche, volaille</mark>"));
+}

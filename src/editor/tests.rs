@@ -102,10 +102,21 @@ fn writes_the_documented_layout() {
         "recipe:\n  name: Croque-monsieur\n  ingredients:\n    - pain de mie\n    - jambon\n  tags:\n    - rapide\n"
     );
     assert_eq!(
-        ingredients_yaml(&["lait".into()], &["sel".into()]),
+        ingredients_yaml(&["lait".into()], &["sel".into()], &[]),
         "ingredients:\n  - lait\nstaples:\n  - sel\n"
     );
-    assert_eq!(ingredients_yaml(&[], &[]), "ingredients: []\n");
+    assert_eq!(ingredients_yaml(&[], &[], &[]), "ingredients: []\n");
+    assert_eq!(
+        ingredients_yaml(
+            &["steak haché".into()],
+            &[],
+            &[IngredientTag {
+                name: "viande rouge".into(),
+                ingredients: vec!["steak haché".into()],
+            }]
+        ),
+        "ingredients:\n  - steak haché\ningredient_tags:\n  viande rouge:\n    - steak haché\n"
+    );
     assert_eq!(tags_yaml(&[], &[]), "tags: []\n");
     assert_eq!(
         tags_yaml(
@@ -273,7 +284,13 @@ fn renaming_an_ingredient_renames_it_in_recipes() {
     let editor = editor(&dir);
     let version = editor.version(Path::new(INGREDIENTS_FILE));
     editor
-        .update_ingredient(&version, "jambon", "jambon blanc", false)
+        .update_ingredient(
+            &version,
+            "jambon",
+            "jambon blanc",
+            false,
+            &["charcuterie".into()],
+        )
         .unwrap();
     let catalog = editor.catalog().unwrap();
     let position = |name: &str| catalog.ingredients.iter().position(|i| i.name == name);
@@ -290,13 +307,89 @@ fn renaming_an_ingredient_renames_it_in_recipes() {
     );
 }
 
+fn ingredient_tags(editor: &Editor) -> Vec<(String, Vec<String>)> {
+    editor
+        .catalog()
+        .unwrap()
+        .ingredient_tags
+        .into_iter()
+        .map(|tag| (tag.name, tag.ingredients))
+        .collect()
+}
+
+#[test]
+fn ingredient_tags_follow_ingredient_edits() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = || editor.version(Path::new(INGREDIENTS_FILE));
+    let tags_of = |name: &str| -> Vec<String> {
+        ingredient_tags(&editor)
+            .into_iter()
+            .filter(|(_, ingredients)| ingredients.iter().any(|i| i == name))
+            .map(|(tag, _)| tag)
+            .collect()
+    };
+
+    // An existing tag under another spelling, and a new tag.
+    editor
+        .update_ingredient(
+            &version(),
+            "poulet",
+            "poulet",
+            false,
+            &["Viande Blanche".into(), "volaille".into()],
+        )
+        .unwrap();
+    assert_eq!(tags_of("poulet"), ["viande blanche", "volaille"]);
+
+    // A tag left without ingredients disappears.
+    editor
+        .update_ingredient(&version(), "poulet", "poulet", false, &["volaille".into()])
+        .unwrap();
+    assert!(
+        !ingredient_tags(&editor)
+            .iter()
+            .any(|(tag, _)| tag == "viande blanche")
+    );
+
+    // Renaming keeps the tags; deleting removes the ingredient from them.
+    editor
+        .update_ingredient(
+            &version(),
+            "jambon",
+            "jambon blanc",
+            false,
+            &["charcuterie".into()],
+        )
+        .unwrap();
+    assert_eq!(tags_of("jambon blanc"), ["charcuterie"]);
+    editor
+        .add_ingredient(&version(), "saucisson", false)
+        .unwrap();
+    editor
+        .update_ingredient(
+            &version(),
+            "saucisson",
+            "saucisson",
+            false,
+            &["charcuterie".into()],
+        )
+        .unwrap();
+    editor.delete_ingredient(&version(), "saucisson").unwrap();
+    let charcuterie = ingredient_tags(&editor)
+        .into_iter()
+        .find(|(tag, _)| tag == "charcuterie")
+        .unwrap();
+    assert_eq!(charcuterie.1, ["lardons", "jambon blanc"]);
+}
+
 #[test]
 fn an_ingredient_can_become_a_staple() {
     let dir = example_copy();
     let editor = editor(&dir);
     let version = editor.version(Path::new(INGREDIENTS_FILE));
     editor
-        .update_ingredient(&version, "beurre", "beurre", true)
+        .update_ingredient(&version, "beurre", "beurre", true, &[])
         .unwrap();
     let catalog = editor.catalog().unwrap();
     let last = catalog.ingredients.last().unwrap();
@@ -464,6 +557,7 @@ recipe:
                     ("oeufs".into(), "œufs".into()),
                     ("Enfants".into(), "enfants".into()),
                 ],
+                ingredient_tags: vec![],
             }
         );
         let catalog = editor.catalog().unwrap();
@@ -574,6 +668,44 @@ recipe:
             [ImportProblem {
                 line: Some(2),
                 kind: ImportProblemKind::Catalog(ProblemKind::EmptyName)
+            }]
+        ));
+    }
+
+    #[test]
+    fn ingredient_tags_are_merged() {
+        let dir = example_copy();
+        let editor = editor(&dir);
+        let input = "\
+ingredients: [steak haché]
+ingredient_tags:
+  viande rouge: [steak haché]
+  Légumes: [Oignon, ail]
+";
+        let report = editor.import(input).unwrap();
+        assert_eq!(report.new_ingredients, ["steak haché"]);
+        assert_eq!(report.ingredient_tags, ["viande rouge", "légumes"]);
+        assert!(
+            report
+                .mapped
+                .contains(&("Légumes".into(), "légumes".into()))
+        );
+        let tags = ingredient_tags(&editor);
+        let legumes = tags.iter().find(|(tag, _)| tag == "légumes").unwrap();
+        assert_eq!(legumes.1.last().map(String::as_str), Some("ail"));
+        assert!(tags.contains(&("viande rouge".into(), vec!["steak haché".into()])));
+    }
+
+    #[test]
+    fn unknown_ingredients_in_ingredient_tags_are_located() {
+        let dir = example_copy();
+        let input = "ingredient_tags:\n  viande rouge:\n    - steak haché\n";
+        let problems = problems(editor(&dir).import(input).unwrap_err());
+        assert!(matches!(
+            problems.as_slice(),
+            [ImportProblem {
+                line: Some(3),
+                kind: ImportProblemKind::Catalog(ProblemKind::UnknownIngredient { .. })
             }]
         ));
     }

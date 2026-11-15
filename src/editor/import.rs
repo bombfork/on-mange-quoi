@@ -1,5 +1,6 @@
-//! Import of raw YAML: any number of documents, each one either ingredients (`ingredients`
-//! and/or `staples`, as in `ingredients.yml`) or one recipe (`recipe`, as in a recipe file).
+//! Import of raw YAML: any number of documents, each one either ingredients (`ingredients`,
+//! `staples` and/or `ingredient_tags`, as in `ingredients.yml`) or one recipe (`recipe`, as in a
+//! recipe file). Ingredient tags are merged into the catalog's.
 //!
 //! The whole input is accepted or refused. Ingredients already in the catalog are skipped, and
 //! names that only differ from a known name by spelling are imported as that name, so the same
@@ -14,10 +15,10 @@ use serde::de::IgnoredAny;
 use serde_saphyr::Spanned;
 
 use super::{Change, EditError, Editor, RecipeInput, ingredient_lists, recipe_path, recipe_yaml};
-use crate::catalog::normalize::normalize;
-use crate::catalog::{Catalog, INGREDIENTS_FILE, ProblemKind};
+use crate::catalog::normalize::{closest, normalize};
+use crate::catalog::{Catalog, INGREDIENTS_FILE, IngredientTag, ProblemKind};
 
-const KEYS: [&str; 3] = ["ingredients", "staples", "recipe"];
+const KEYS: [&str; 4] = ["ingredients", "staples", "ingredient_tags", "recipe"];
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ImportReport {
@@ -27,6 +28,8 @@ pub struct ImportReport {
     pub new_ingredients: Vec<String>,
     /// Names imported under the spelling of a known name: (typed, known).
     pub mapped: Vec<(String, String)>,
+    /// Ingredient tags created or given new ingredients.
+    pub ingredient_tags: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -63,6 +66,7 @@ type Name = Spanned<String>;
 struct Document {
     ingredients: Option<Vec<Name>>,
     staples: Option<Vec<Name>>,
+    ingredient_tags: Option<HashMap<Name, Option<Vec<Name>>>>,
     recipe: Option<RecipeDocument>,
 }
 
@@ -112,6 +116,60 @@ impl Editor {
             }
         }
 
+        let mut ingredient_tags = catalog.ingredient_tags.clone();
+        for document in &documents {
+            let mut entries: Vec<_> = document.ingredient_tags.iter().flatten().collect();
+            entries.sort_by_key(|(tag, _)| tag.referenced.line());
+            for (tag, members) in entries {
+                let typed = tag.value.trim();
+                if typed.is_empty() {
+                    problems.push(located(tag.referenced.line(), ProblemKind::EmptyName));
+                    continue;
+                }
+                let names: Vec<String> = members
+                    .iter()
+                    .flatten()
+                    .filter_map(|member| {
+                        let resolved = resolver.ingredient(member.value.trim(), &mut report.mapped);
+                        if resolved.is_none() {
+                            let known = resolver.ingredient_names();
+                            problems.push(located(
+                                member.referenced.line(),
+                                ProblemKind::UnknownIngredient {
+                                    name: member.value.clone(),
+                                    suggestion: closest(&member.value, known.iter().copied())
+                                        .map(str::to_string),
+                                },
+                            ));
+                        }
+                        resolved
+                    })
+                    .collect();
+                let existing = ingredient_tags.iter().map(|t| t.name.as_str());
+                let name = resolve(typed, existing, &mut report.mapped)
+                    .unwrap_or_else(|| typed.to_string());
+                let position = match ingredient_tags.iter().position(|t| t.name == name) {
+                    Some(position) => position,
+                    None => {
+                        ingredient_tags.push(IngredientTag {
+                            name: name.clone(),
+                            ingredients: Vec::new(),
+                        });
+                        ingredient_tags.len() - 1
+                    }
+                };
+                let tag = &mut ingredient_tags[position];
+                for member in names {
+                    if !tag.ingredients.contains(&member) {
+                        tag.ingredients.push(member);
+                        if !report.ingredient_tags.contains(&name) {
+                            report.ingredient_tags.push(name.clone());
+                        }
+                    }
+                }
+            }
+        }
+
         let mut taken: HashSet<String> = HashSet::new();
         let mut recipes = Vec::new();
         for document in &documents {
@@ -154,12 +212,12 @@ impl Editor {
         if !problems.is_empty() {
             return Err(ImportError::Invalid(problems));
         }
-        if declared.is_empty() && recipes.is_empty() {
+        if declared.is_empty() && recipes.is_empty() && report.ingredient_tags.is_empty() {
             return Err(ImportError::Empty);
         }
 
         let mut changes = Vec::new();
-        if !declared.is_empty() {
+        if !declared.is_empty() || !report.ingredient_tags.is_empty() {
             let (mut ingredients, mut staples) = ingredient_lists(&catalog);
             for (name, staple, _) in &declared {
                 let list = if *staple {
@@ -171,7 +229,11 @@ impl Editor {
             }
             changes.push(Change {
                 path: INGREDIENTS_FILE.into(),
-                content: Some(super::ingredients_yaml(&ingredients, &staples)),
+                content: Some(super::ingredients_yaml(
+                    &ingredients,
+                    &staples,
+                    &ingredient_tags,
+                )),
             });
         }
         for recipe in &recipes {
@@ -271,6 +333,13 @@ impl<'a> Resolver<'a> {
         self.declared
             .entry(normalize(name))
             .or_insert_with(|| name.to_string());
+    }
+
+    fn ingredient_names(&self) -> Vec<&str> {
+        let catalog = self.catalog.ingredients.iter().map(|i| i.name.as_str());
+        catalog
+            .chain(self.declared.values().map(String::as_str))
+            .collect()
     }
 
     /// The known ingredient `typed` stands for, if any; records spelling differences.

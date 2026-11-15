@@ -20,7 +20,7 @@
 {% else %}
 <ul>
   {% for item in items %}
-  <li><a href="{{ item.edit_url }}">{{ item.name }}</a>{% if item.staple %} <small>({{ t.editor.staple_marker }})</small>{% endif %}{% if !item.uses.is_empty() %} <small>{{ item.uses }}</small>{% endif %}</li>
+  <li><a href="{{ item.edit_url }}">{{ item.name }}</a>{% if item.staple %} <small>({{ t.editor.staple_marker }})</small>{% endif %}{% if !item.tags.is_empty() %} <small><mark>{{ item.tags }}</mark></small>{% endif %}{% if !item.uses.is_empty() %} <small>{{ item.uses }}</small>{% endif %}</li>
   {% endfor %}
 </ul>
 {% endif %}

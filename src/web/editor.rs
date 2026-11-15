@@ -574,6 +574,8 @@ struct NameRow {
     edit_url: String,
     staple: bool,
     uses: String,
+    /// Ingredient tags of an ingredient, joined.
+    tags: String,
 }
 
 #[derive(Template)]
@@ -611,6 +613,7 @@ fn names_page(
         .map(|(name, staple)| {
             let count = kind.users(&catalog, &name).len();
             NameRow {
+                tags: tags_of(&catalog, kind, &name).join(", "),
                 edit_url: kind.edit_url(&name),
                 uses: if count == 0 {
                     String::new()
@@ -714,8 +717,31 @@ struct NamePage {
     new_name: String,
     with_staple: bool,
     staple: bool,
+    /// Ingredient tags, for an ingredient.
+    ingredient_tags: Vec<Choice>,
     used_by: String,
     list_url: String,
+}
+
+/// Values of the edit form of an ingredient or a tag, shown again after an error.
+struct NameForm {
+    version: String,
+    new_name: String,
+    staple: bool,
+    tags: Vec<String>,
+}
+
+/// Names of the ingredient tags of an ingredient (none for a recipe tag).
+fn tags_of(catalog: &Catalog, kind: Kind, name: &str) -> Vec<String> {
+    if kind != Kind::Ingredient {
+        return Vec::new();
+    }
+    catalog
+        .ingredient_tags
+        .iter()
+        .filter(|tag| tag.ingredients.iter().any(|i| i == name))
+        .map(|tag| tag.name.clone())
+        .collect()
 }
 
 /// Edit page of one ingredient or tag; `form` holds the values to show again after an error.
@@ -723,7 +749,7 @@ fn name_page(
     state: &AppState,
     kind: Kind,
     name: &str,
-    form: Option<(&str, &str, bool)>,
+    form: Option<NameForm>,
     errors: Vec<String>,
 ) -> Response {
     let catalog = match state.editor.catalog() {
@@ -734,8 +760,23 @@ fn name_page(
     else {
         return message_page(state, &EditError::NotFound);
     };
-    let current_version = state.editor.version(kind.file());
-    let (version, new_name, staple) = form.unwrap_or((&current_version, name, current_staple));
+    let form = form.unwrap_or_else(|| NameForm {
+        version: state.editor.version(kind.file()),
+        new_name: name.to_string(),
+        staple: current_staple,
+        tags: tags_of(&catalog, kind, name),
+    });
+    let ingredient_tags = match kind {
+        Kind::Ingredient => catalog
+            .ingredient_tags
+            .iter()
+            .map(|tag| Choice {
+                name: tag.name.clone(),
+                checked: form.tags.contains(&tag.name),
+            })
+            .collect(),
+        Kind::Tag => Vec::new(),
+    };
     let users = kind.users(&catalog, name);
     let m = &MESSAGES.editor;
     let heading = match kind {
@@ -751,11 +792,12 @@ fn name_page(
         heading: interpolate(heading, &[("name", &name)]),
         save_action: format!("{}/edit", kind.base()),
         delete_action: format!("{}/delete", kind.base()),
-        version: version.to_string(),
+        version: form.version,
         old_name: name.to_string(),
-        new_name: new_name.to_string(),
+        new_name: form.new_name,
         with_staple: kind == Kind::Ingredient,
-        staple,
+        staple: form.staple,
+        ingredient_tags,
         used_by: if users.is_empty() {
             String::new()
         } else {
@@ -809,6 +851,12 @@ fn update_name(state: &AppState, kind: Kind, pairs: &[(String, String)]) -> Resp
                     value: "1".into(),
                 });
             }
+            for key in ["ingredient_tag", "new_tag"] {
+                fields.extend(all(pairs, key).into_iter().map(|value| Field {
+                    name: key.into(),
+                    value,
+                }));
+            }
             fields.push(Field {
                 name: "confirm".into(),
                 value: "1".into(),
@@ -831,7 +879,13 @@ fn update_name(state: &AppState, kind: Kind, pairs: &[(String, String)]) -> Resp
     }
 
     let result = match kind {
-        Kind::Ingredient => state.editor.update_ingredient(&version, &old, &new, staple),
+        Kind::Ingredient => {
+            let mut tags = all(pairs, "ingredient_tag");
+            tags.push(first(pairs, "new_tag"));
+            state
+                .editor
+                .update_ingredient(&version, &old, &new, staple, &tags)
+        }
         Kind::Tag => state.editor.update_tag(&version, &old, &new),
     };
     match result {
@@ -839,13 +893,15 @@ fn update_name(state: &AppState, kind: Kind, pairs: &[(String, String)]) -> Resp
             state.live.reload();
             done(kind.base(), "updated")
         }
-        Err(error) => name_page(
-            state,
-            kind,
-            &old,
-            Some((&version, &new, staple)),
-            error_messages(&error),
-        ),
+        Err(error) => {
+            let form = NameForm {
+                version,
+                new_name: new,
+                staple,
+                tags: all(pairs, "ingredient_tag"),
+            };
+            name_page(state, kind, &old, Some(form), error_messages(&error))
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 //! On-disk YAML file types. The top-level key gives the file type.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use serde::Deserialize;
@@ -19,6 +19,12 @@ pub struct IngredientsFile {
     pub ingredients: Option<Vec<Name>>,
     #[cfg_attr(test, schemars(with = "Option<Vec<String>>"))]
     pub staples: Option<Vec<Name>>,
+    /// Ingredient tags: each tag name with the catalog ingredients it applies to.
+    #[cfg_attr(
+        test,
+        schemars(with = "Option<std::collections::BTreeMap<String, Option<Vec<String>>>>")
+    )]
+    pub ingredient_tags: Option<HashMap<Name, Option<Vec<Name>>>>,
 }
 
 #[derive(Debug, Deserialize)]

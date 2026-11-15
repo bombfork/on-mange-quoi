@@ -43,6 +43,8 @@
     "no_ingredients": "la recette n’a aucun ingrédient",
     "duplicate_ingredient": "ingrédient en double\u00a0: «\u00a0{name}\u00a0», déjà présent sous la forme «\u00a0{other}\u00a0» (ligne {line})",
     "duplicate_tag": "tag en double\u00a0: «\u00a0{name}\u00a0», déjà présent sous la forme «\u00a0{other}\u00a0» (ligne {line})",
+    "duplicate_ingredient_tag": "tag d’ingrédient en double\u00a0: «\u00a0{name}\u00a0», déjà présent sous la forme «\u00a0{other}\u00a0» (ligne {line})",
+    "repeated_in_ingredient_tag": "«\u00a0{name}\u00a0» apparaît plusieurs fois dans le tag d’ingrédient «\u00a0{tag}\u00a0»",
     "empty_choice": "groupe de choix vide",
     "repeated_choice": "tag présent plusieurs fois dans les choix\u00a0: «\u00a0{name}\u00a0»",
     "duplicate_recipe_name": "nom de recette en double\u00a0: «\u00a0{name}\u00a0», déjà utilisé par {other}",
@@ -97,8 +99,10 @@
     "any": "Peu importe",
     "other_criteria": "Autres critères",
     "apply": "Appliquer",
+    "refine": "Affiner",
     "stock_heading": "En stock",
     "stock_help": "Les produits de base comptent toujours comme en stock.",
+    "quick": "Ajouter en un clic\u00a0:",
     "search": "Ajouter un ingrédient en stock",
     "add": "Ajouter",
     "remove": "Retirer",
@@ -162,6 +166,9 @@
     "import_invalid": "Import refusé, rien n’a été enregistré\u00a0:",
     "import_line": "Ligne {line}\u00a0: {message}",
     "import_unknown_key": "clé inconnue «\u00a0{key}\u00a0», clés attendues\u00a0: «\u00a0ingredients\u00a0», «\u00a0staples\u00a0» ou «\u00a0recipe\u00a0»",
-    "import_mixed": "un document contient soit des ingrédients, soit une recette, pas les deux"
+    "import_mixed": "un document contient soit des ingrédients, soit une recette, pas les deux",
+    "ingredient_tags": "Tags d’ingrédient",
+    "new_ingredient_tag": "Nouveau tag d’ingrédient",
+    "new_ingredient_tag_example": "par exemple viande rouge"
   }
 }

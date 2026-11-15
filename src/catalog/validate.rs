@@ -7,13 +7,14 @@ use std::path::Path;
 
 use super::files::{Name, position};
 use super::normalize::{closest, normalize};
-use super::{Catalog, Ingredient, Problem, ProblemKind, Recipe, Sources};
+use super::{Catalog, Ingredient, IngredientTag, Problem, ProblemKind, Recipe, Sources};
 
 pub(super) fn validate(
     sources: &Sources,
     mut problems: Vec<Problem>,
 ) -> Result<Catalog, Vec<Problem>> {
     let ingredients = validate_ingredients(sources, &mut problems);
+    let ingredient_tags = validate_ingredient_tags(sources, &ingredients, &mut problems);
     let tags = validate_tags(sources, &mut problems);
     let choices = validate_choices(sources, &tags, &mut problems);
 
@@ -106,6 +107,7 @@ pub(super) fn validate(
             ingredients,
             tags,
             choices,
+            ingredient_tags,
             recipes,
         })
     } else {
@@ -156,6 +158,58 @@ fn validate_tags(sources: &Sources, problems: &mut Vec<Problem>) -> Vec<String> 
         if seen.accept(&source.path, name, duplicate, problems) {
             tags.push(name.value.clone());
         }
+    }
+    tags
+}
+
+/// Ingredient tags: unique names, each one listing catalog ingredients once.
+fn validate_ingredient_tags(
+    sources: &Sources,
+    ingredients: &[Ingredient],
+    problems: &mut Vec<Problem>,
+) -> Vec<IngredientTag> {
+    let Some(source) = &sources.ingredients else {
+        return Vec::new();
+    };
+    let mut entries: Vec<_> = source.file.ingredient_tags.iter().flatten().collect();
+    entries.sort_by_key(|(tag, _)| (tag.referenced.line(), tag.referenced.column()));
+    let names: Vec<&str> = ingredients.iter().map(|i| i.name.as_str()).collect();
+    let mut seen = Seen::default();
+    let mut tags = Vec::new();
+    for (tag, members) in entries {
+        let duplicate = |other: String, line| ProblemKind::DuplicateIngredientTag {
+            name: tag.value.clone(),
+            other,
+            line,
+        };
+        if !seen.accept(&source.path, tag, duplicate, problems) {
+            continue;
+        }
+        let mut accepted: Vec<String> = Vec::new();
+        for member in members.iter().flatten() {
+            let value = member.value.as_str();
+            let kind = if value.trim().is_empty() {
+                ProblemKind::EmptyName
+            } else if !names.contains(&value) {
+                ProblemKind::UnknownIngredient {
+                    name: value.to_string(),
+                    suggestion: closest(value, names.iter().copied()).map(str::to_string),
+                }
+            } else if accepted.iter().any(|name| name == value) {
+                ProblemKind::RepeatedInIngredientTag {
+                    tag: tag.value.clone(),
+                    name: value.to_string(),
+                }
+            } else {
+                accepted.push(value.to_string());
+                continue;
+            };
+            problems.push(Problem::new(&source.path, position(member), kind));
+        }
+        tags.push(IngredientTag {
+            name: tag.value.clone(),
+            ingredients: accepted,
+        });
     }
     tags
 }

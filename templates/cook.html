@@ -12,6 +12,15 @@
 </div>
 {% endfor %}
 
+{% if !refine_buttons.is_empty() %}
+<p class="step-label">{{ t.cook.refine }}</p>
+<div class="choice-group">
+  {% for button in refine_buttons %}
+  <a href="{{ button.url }}" role="button"{% if !button.selected %} class="outline"{% endif %}>{{ button.label }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if !other_tags.is_empty() %}
 <details{% if other_open %} open{% endif %}>
   <summary>{{ t.cook.other_criteria }}</summary>
@@ -37,6 +46,14 @@
   {% for notice in notices %}
   <p class="notice">{{ notice }}</p>
   {% endfor %}
+  {% if !quick.is_empty() %}
+  <p class="step-label">{{ t.cook.quick }}</p>
+  <div class="quick-additions">
+    {% for item in quick %}
+    <a href="{{ item.url }}" role="button" class="secondary outline">+ {{ item.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
   <form method="get" action="/cook">
     {% for field in state_fields %}
     <input type="hidden" name="{{ field.name }}" value="{{ field.value }}" />
@@ -57,7 +74,7 @@
   {% else %}
   <ul class="selected-ingredients">
     {% for item in stock %}
-    <li><span>{{ item.name }}</span><a href="{{ item.remove_url }}" role="button" class="secondary outline">{{ t.cook.remove }}</a></li>
+    <li><span>{{ item.name }}</span><a href="{{ item.url }}" role="button" class="secondary outline">{{ t.cook.remove }}</a></li>
     {% endfor %}
   </ul>
   {% endif %}

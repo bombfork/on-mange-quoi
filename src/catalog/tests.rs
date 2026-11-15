@@ -455,6 +455,53 @@ fn choices_group_declared_tags_once() {
 }
 
 #[test]
+fn ingredient_tags_list_catalog_ingredients_in_file_order() {
+    let ingredients = format!(
+        "{INGREDIENTS}ingredient_tags:\n  viande blanche:\n    - jambon\n  produits laitiers:\n    - beurre\n  vide:\n"
+    );
+    let dir = catalog_dir(&[("ingredients.yml", &ingredients)]);
+    let catalog = load(dir.path()).unwrap();
+    let tags: Vec<(&str, Vec<&str>)> = catalog
+        .ingredient_tags
+        .iter()
+        .map(|t| {
+            (
+                t.name.as_str(),
+                t.ingredients.iter().map(String::as_str).collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        tags,
+        [
+            ("viande blanche", vec!["jambon"]),
+            ("produits laitiers", vec!["beurre"]),
+            ("vide", vec![]),
+        ]
+    );
+}
+
+#[test]
+fn ingredient_tags_are_checked() {
+    let ingredients = format!(
+        "{INGREDIENTS}ingredient_tags:\n  viande:\n    - jambon\n    - jambon\n    - jambons\n  Viandes:\n    - beurre\n"
+    );
+    let kinds = load_problems(&[("ingredients.yml", &ingredients)]);
+    assert!(
+        matches!(
+            kinds.as_slice(),
+            [
+                ProblemKind::RepeatedInIngredientTag { tag, name },
+                ProblemKind::UnknownIngredient { name: unknown, suggestion: Some(suggestion) },
+                ProblemKind::DuplicateIngredientTag { name: duplicate, other, .. },
+            ] if tag == "viande" && name == "jambon" && unknown == "jambons"
+                && suggestion == "jambon" && duplicate == "Viandes" && other == "viande"
+        ),
+        "{kinds:?}"
+    );
+}
+
+#[test]
 fn fingerprint_follows_the_files_load_reads() {
     let dir = catalog_dir(&[]);
     let base = fingerprint(dir.path());
