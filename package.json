@@ -1,0 +1,23 @@
+{
+  "name": "on-mange-quoi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meal planner and shopping list helper for families. French-first, client-side.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "repository": "github:bombfork/on-mange-quoi",
+  "scripts": {
+    "lint": "oxlint --deny-warnings js scripts tests",
+    "format": "oxfmt --check js scripts tests",
+    "format:fix": "oxfmt js scripts tests",
+    "validate:i18n": "node scripts/validate-i18n.js",
+    "test:unit": "node --test \"tests/**/*.test.js\"",
+    "validate:all": "npm run lint && npm run format && npm run validate:i18n && npm run test:unit"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "http-server": "^14.1.1",
+    "oxfmt": "^0.78.0",
+    "oxlint": "^1.93.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "app": {
+    "title": "On mange quoi ?",
+    "tagline": "Les menus de la semaine et la liste de courses, sans prise de tête."
+  },
+  "landing": {
+    "intro": "Choisir le nombre de repas et les critères : l’application propose des menus, vérifie ce qui est déjà en stock, puis prépare la liste de courses.",
+    "status": "Application en cours de construction."
+  }
+}
