@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RecipeFile",
+  "type": "object",
+  "properties": {
+    "recipe": {
+      "$ref": "#/$defs/RecipeEntry"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "recipe"
+  ],
+  "$defs": {
+    "RecipeEntry": {
+      "type": "object",
+      "properties": {
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "tags": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "ingredients"
+      ]
+    }
+  }
+}

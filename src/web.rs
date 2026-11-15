@@ -1,21 +1,31 @@
 //! HTTP routes. Pages are rendered on the server; static assets are embedded in the binary.
 
+use std::sync::Arc;
+
 use askama::Template;
 use axum::Router;
+use axum::extract::State;
 use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 
-use crate::i18n::{MESSAGES, Messages};
+use crate::catalog::Catalog;
+use crate::i18n::{MESSAGES, Messages, interpolate};
 
 const PICO_CSS: &str = include_str!("../assets/pico.min.css");
 const MAIN_CSS: &str = include_str!("../assets/main.css");
 
-pub fn router() -> Router {
+#[derive(Clone)]
+struct AppState {
+    catalog: Arc<Catalog>,
+}
+
+pub fn router(catalog: Arc<Catalog>) -> Router {
     Router::new()
         .route("/", get(landing))
         .route("/assets/pico.min.css", get(|| async { css(PICO_CSS) }))
         .route("/assets/main.css", get(|| async { css(MAIN_CSS) }))
+        .with_state(AppState { catalog })
 }
 
 fn css(body: &'static str) -> impl IntoResponse {
@@ -26,10 +36,18 @@ fn css(body: &'static str) -> impl IntoResponse {
 #[template(path = "landing.html")]
 struct LandingPage {
     t: &'static Messages,
+    catalog_summary: String,
 }
 
-async fn landing() -> Response {
-    render(&LandingPage { t: &MESSAGES })
+async fn landing(State(state): State<AppState>) -> Response {
+    let catalog_summary = interpolate(
+        &MESSAGES.landing.catalog_summary,
+        &[("count", &state.catalog.recipes.len())],
+    );
+    render(&LandingPage {
+        t: &MESSAGES,
+        catalog_summary,
+    })
 }
 
 fn render(page: &impl Template) -> Response {
@@ -52,7 +70,7 @@ mod tests {
     use super::*;
 
     async fn get(uri: &str) -> Response {
-        router()
+        router(Arc::new(Catalog::default()))
             .oneshot(Request::get(uri).body(Body::empty()).unwrap())
             .await
             .unwrap()
@@ -70,6 +88,10 @@ mod tests {
         let body = body_text(response).await;
         assert!(body.contains(&MESSAGES.app.title));
         assert!(body.contains(&MESSAGES.landing.intro));
+        assert!(body.contains(&interpolate(
+            &MESSAGES.landing.catalog_summary,
+            &[("count", &0)]
+        )));
     }
 
     #[tokio::test]

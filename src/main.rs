@@ -1,14 +1,14 @@
-mod i18n;
-mod web;
-
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use anyhow::{Context, bail};
 use clap::Parser;
 
-use crate::i18n::{MESSAGES, interpolate};
+use on_mange_quoi::catalog::{self, Catalog, Problem};
+use on_mange_quoi::i18n::{MESSAGES, interpolate};
+use on_mange_quoi::{report, web};
 
 #[derive(Debug, Parser)]
 #[command(version, about = MESSAGES.cli.about.as_str())]
@@ -22,12 +22,25 @@ struct Cli {
 
     #[arg(long, default_value_t = 8080, help = MESSAGES.cli.port.as_str())]
     port: u16,
+
+    #[arg(
+        long,
+        value_name = "FILE",
+        help = MESSAGES.cli.validate.as_str(),
+        conflicts_with_all = ["host", "port"],
+    )]
+    validate: Vec<PathBuf>,
 }
 
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
-    match serve(cli).await {
+    let result = if cli.validate.is_empty() {
+        serve(cli).await
+    } else {
+        validate(&cli)
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error:#}");
@@ -36,13 +49,15 @@ async fn main() -> ExitCode {
     }
 }
 
+fn validate(cli: &Cli) -> anyhow::Result<()> {
+    let catalog = load_catalog(&cli.catalog, &cli.validate)?;
+    println!("{}", summary(&MESSAGES.cli.catalog_valid, &catalog));
+    Ok(())
+}
+
 async fn serve(cli: Cli) -> anyhow::Result<()> {
-    if !cli.catalog.is_dir() {
-        bail!(interpolate(
-            &MESSAGES.cli.catalog_not_a_directory,
-            &[("path", &cli.catalog.display())],
-        ));
-    }
+    let catalog = load_catalog(&cli.catalog, &[])?;
+    println!("{}", summary(&MESSAGES.cli.catalog_loaded, &catalog));
 
     let address = SocketAddr::new(cli.host, cli.port);
     let listener = tokio::net::TcpListener::bind(address)
@@ -57,10 +72,40 @@ async fn serve(cli: Cli) -> anyhow::Result<()> {
         )
     );
 
-    axum::serve(listener, web::router())
+    axum::serve(listener, web::router(Arc::new(catalog)))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
+}
+
+/// Loads the catalog with `extra_files` on top; on failure, prints every problem.
+fn load_catalog(dir: &Path, extra_files: &[PathBuf]) -> anyhow::Result<Catalog> {
+    if !dir.is_dir() {
+        bail!(interpolate(
+            &MESSAGES.cli.catalog_not_a_directory,
+            &[("path", &dir.display())],
+        ));
+    }
+    catalog::load_with(dir, extra_files).or_else(|problems: Vec<Problem>| {
+        for problem in &problems {
+            eprintln!("{}", report::describe(problem));
+        }
+        bail!(interpolate(
+            &MESSAGES.cli.catalog_invalid,
+            &[("count", &problems.len())],
+        ))
+    })
+}
+
+fn summary(template: &str, catalog: &Catalog) -> String {
+    interpolate(
+        template,
+        &[
+            ("recipes", &catalog.recipes.len()),
+            ("ingredients", &catalog.ingredients.len()),
+            ("tags", &catalog.tags.len()),
+        ],
+    )
 }
 
 async fn shutdown_signal() {

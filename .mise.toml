@@ -37,3 +37,8 @@ run = "cargo upgrade --incompatible && cargo update"
 [tasks.check]
 description = "Run all checks (format, lint, build, test)"
 depends = ["fmt:check", "lint:check", "build", "test"]
+
+[tasks.schemas]
+description = "Regenerate the JSON Schemas of the catalog files in schemas/"
+run = "cargo test --lib schemas_are_up_to_date"
+env = { UPDATE_SCHEMAS = "1" }

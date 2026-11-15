@@ -19,8 +19,9 @@ On mange quoi ? is a meal planner for families: it proposes meals for a period, 
 stock with the user, and outputs a shopping list. It is self-hosted on the family's local
 network.
 
-Current state: skeleton only. The binary parses `--catalog`, `--host` and `--port` and serves a
-landing page; the catalog is not loaded yet and no product feature is implemented.
+Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
+serves a landing page. The main flow (menu proposal, stock check, shopping list) is not
+implemented yet.
 
 ## Technical decisions
 
@@ -63,11 +64,26 @@ Always use mise tasks, not `cargo` directly.
 - `mise run test` - unit tests and CLI integration tests
 - `mise run check` - all checks; run before every commit (CI runs the same)
 - `mise run deps:update` - upgrade dependencies (cargo-edit)
+- `mise run schemas` - regenerate `schemas/*.json` after changing the catalog file types (a test
+  fails while they are out of date)
 
 ## Architecture
 
-- `src/main.rs` - command line (clap) and server startup, graceful shutdown on Ctrl-C/SIGTERM.
+- `src/lib.rs` - library crate holding every module; `src/main.rs` is the command line (clap):
+  either `--validate` or serve, with graceful shutdown on Ctrl-C/SIGTERM.
+- `src/catalog/` - domain module, no HTTP/template/i18n dependency:
+  - `mod.rs` - `Catalog`, `Problem`/`ProblemKind`, reading the layout, `load()` and `load_with()`
+    (extra files from `--validate` added on top or replacing catalog files);
+  - `files.rs` - serde types of the three file types, parsed with serde-saphyr (`serde_yaml` is
+    archived). `Spanned` gives the line and column of every name for error messages. Also file
+    kind detection and the schema generation test;
+  - `normalize.rs` - name normalization and closest-name suggestion;
+  - `validate.rs` - cross-file rules (uniqueness, references, removed names still in use);
+  - `tests.rs` - one test per rule, on temporary catalog directories.
+- `src/report.rs` - renders problems in French as `path:line:column : message`. Structural errors
+  (unknown key, wrong type) embed the parser's English message.
 - `src/web.rs` - axum routes; renders askama templates and serves the embedded stylesheets.
+  The loaded catalog is shared through the router state.
 - `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct
   (`deny_unknown_fields`), so templates reference keys as fields checked at compile time.
   `interpolate()` fills `{name}` placeholders. Tests enforce French typography in the locale.
@@ -76,6 +92,7 @@ Always use mise tasks, not `cargo` directly.
 - `assets/pico.min.css` - vendored Pico CSS v2, embedded in the binary; `assets/main.css` holds
   the app's own styles.
 - `examples/catalog/` - example catalog, used by `mise run dev`.
+- `schemas/` - JSON Schemas of the catalog files, generated from the serde types.
 - `tests/cli.rs` - command-line integration tests (assert_cmd).
 
 ## Product design

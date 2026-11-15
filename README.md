@@ -6,7 +6,8 @@ the shopping list.
 
 The user interface is in French. The code and documentation are in English.
 
-> **Status:** early bootstrap. The binary serves a landing page; no product feature exists yet.
+> **Status:** early development. The catalog is loaded and validated; the meal planning flow
+> itself is not implemented yet.
 
 ## How it is meant to work
 
@@ -42,7 +43,33 @@ catalog/
   recipes/          # one YAML file per recipe
 ```
 
-See [`examples/catalog`](examples/catalog) for a complete example.
+See [`examples/catalog`](examples/catalog) for a complete example. The server refuses to start
+when the catalog is invalid, and lists every problem.
+
+To check new or modified files against a catalog without serving it:
+
+```bash
+on-mange-quoi --catalog path/to/catalog --validate new-recipe.yml
+# A new recipe may use ingredients added in the same command:
+on-mange-quoi --catalog path/to/catalog --validate new-recipe.yml --validate ingredients.yml
+```
+
+Each file is checked as if it were added to the catalog, or replaced the catalog file of the same
+kind (ingredients, tags) or name (recipe). Removing an ingredient or a tag still used by a recipe
+is an error.
+
+JSON Schemas for the three file types are in [`schemas/`](schemas), for autocompletion in editors
+that support them, for example with the YAML language server:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bombfork/on-mange-quoi/main/schemas/recipe.schema.json
+recipe:
+  name: Coquillettes au jambon mouliné
+  ingredients:
+    - coquillettes
+    - jambon
+    - beurre
+```
 
 ## Development
 
@@ -53,6 +80,7 @@ mise run dev     # Serve examples/catalog on http://localhost:8080
 mise run check   # Format check, clippy, build, tests (CI runs the same)
 mise run fmt     # Apply formatting
 mise run lint    # Apply clippy fixes
+mise run schemas # Regenerate schemas/ after changing the catalog file types
 ```
 
 ## License

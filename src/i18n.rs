@@ -19,6 +19,7 @@ pub struct Messages {
     pub app: AppMessages,
     pub landing: LandingMessages,
     pub cli: CliMessages,
+    pub catalog: CatalogMessages,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +34,7 @@ pub struct AppMessages {
 pub struct LandingMessages {
     pub intro: String,
     pub status: String,
+    pub catalog_summary: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +47,35 @@ pub struct CliMessages {
     pub catalog_not_a_directory: String,
     pub bind_failed: String,
     pub listening: String,
+    pub validate: String,
+    pub catalog_loaded: String,
+    pub catalog_valid: String,
+    pub catalog_invalid: String,
+}
+
+/// Catalog problems, rendered by `report::describe`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogMessages {
+    pub problem: String,
+    pub unreadable: String,
+    pub missing: String,
+    pub syntax: String,
+    pub unknown_file_type: String,
+    pub several_files_of_kind: String,
+    pub unexpected_file: String,
+    pub invalid_recipe_id: String,
+    pub empty_name: String,
+    pub no_ingredients: String,
+    pub duplicate_ingredient: String,
+    pub duplicate_tag: String,
+    pub duplicate_recipe_name: String,
+    pub repeated_in_recipe: String,
+    pub unknown_ingredient: String,
+    pub unknown_tag: String,
+    pub did_you_mean: String,
+    pub ingredient_in_use: String,
+    pub tag_in_use: String,
 }
 
 /// Replaces every `{name}` placeholder with the matching parameter. Unknown placeholders are
