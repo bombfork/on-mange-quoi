@@ -1,5 +1,6 @@
 //! HTTP routes. Pages are rendered on the server; static assets are embedded in the binary.
 
+mod editor;
 mod flow;
 mod menu;
 mod shopping;
@@ -8,11 +9,13 @@ use std::sync::Arc;
 
 use askama::Template;
 use axum::Router;
-use axum::extract::Query;
-use axum::http::{StatusCode, header};
+use axum::extract::{Query, Request};
+use axum::http::{HeaderMap, Method, StatusCode, header};
+use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 
+use crate::editor::Editor;
 use crate::live::{LiveCatalog, Snapshot};
 use crate::report;
 
@@ -25,18 +28,82 @@ type Pairs = Query<Vec<(String, String)>>;
 #[derive(Clone)]
 struct AppState {
     live: Arc<LiveCatalog>,
+    editor: Arc<Editor>,
 }
 
 pub fn router(live: Arc<LiveCatalog>) -> Router {
+    let editor = Arc::new(Editor::new(live.dir().to_path_buf()));
     Router::new()
         .route("/", get(menu::plan))
         .route("/menu", get(menu::proposal))
         .route("/menu/accepted", get(shopping::stock_check))
         .route("/shopping-list", get(shopping::shopping_list))
         .route("/shopping-list.txt", get(shopping::shopping_list_text))
+        .route("/catalog/recipes", get(editor::recipes))
+        .route(
+            "/catalog/recipes/new",
+            get(editor::new_recipe).post(editor::create_recipe),
+        )
+        .route(
+            "/catalog/recipes/{id}",
+            get(editor::edit_recipe).post(editor::update_recipe),
+        )
+        .route(
+            "/catalog/recipes/{id}/delete",
+            get(editor::confirm_delete_recipe).post(editor::delete_recipe),
+        )
+        .route("/catalog/ingredients", get(editor::ingredients))
+        .route(
+            "/catalog/ingredients/new",
+            axum::routing::post(editor::add_ingredient),
+        )
+        .route(
+            "/catalog/ingredients/edit",
+            get(editor::edit_ingredient).post(editor::update_ingredient),
+        )
+        .route(
+            "/catalog/ingredients/delete",
+            axum::routing::post(editor::delete_ingredient),
+        )
+        .route("/catalog/tags", get(editor::tags))
+        .route("/catalog/tags/new", axum::routing::post(editor::add_tag))
+        .route(
+            "/catalog/tags/edit",
+            get(editor::edit_tag).post(editor::update_tag),
+        )
+        .route(
+            "/catalog/tags/delete",
+            axum::routing::post(editor::delete_tag),
+        )
         .route("/assets/pico.min.css", get(|| async { css(PICO_CSS) }))
         .route("/assets/main.css", get(|| async { css(MAIN_CSS) }))
-        .with_state(AppState { live })
+        .layer(middleware::from_fn(same_origin_posts))
+        .with_state(AppState { live, editor })
+}
+
+/// Rejects POST requests sent by other sites: without authentication, any page opened on the
+/// local network could otherwise submit edits to the catalog.
+async fn same_origin_posts(request: Request, next: Next) -> Response {
+    if request.method() == Method::POST && !is_same_origin(request.headers()) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    next.run(request).await
+}
+
+/// `Sec-Fetch-Site`, set by the browser, wins: unlike `Host`, a reverse proxy does not rewrite
+/// it. Browsers without it are checked by comparing `Origin` with `Host`.
+fn is_same_origin(headers: &HeaderMap) -> bool {
+    if let Some(site) = headers.get("sec-fetch-site") {
+        return site == "same-origin" || site == "none";
+    }
+    match (headers.get(header::ORIGIN), headers.get(header::HOST)) {
+        (Some(origin), Some(host)) => origin
+            .to_str()
+            .ok()
+            .and_then(|origin| origin.split_once("://"))
+            .is_some_and(|(_, authority)| authority.as_bytes() == host.as_bytes()),
+        _ => true,
+    }
 }
 
 fn css(body: &'static str) -> impl IntoResponse {
@@ -61,7 +128,6 @@ fn render(page: &impl Template) -> Response {
 
 #[cfg(test)]
 mod test_support {
-    use std::path::PathBuf;
     use std::sync::Arc;
 
     use axum::body::Body;
@@ -73,15 +139,28 @@ mod test_support {
     use crate::catalog::Catalog;
     use crate::live::LiveCatalog;
 
+    /// Serves `catalog` from memory; its directory is an empty temporary one.
     pub async fn get(catalog: Catalog, uri: &str) -> Response {
-        get_live(Arc::new(LiveCatalog::new(PathBuf::new(), catalog)), uri).await
+        let dir = tempfile::TempDir::new().unwrap();
+        let live = LiveCatalog::new(dir.path().to_path_buf(), catalog);
+        get_live(Arc::new(live), uri).await
     }
 
     pub async fn get_live(live: Arc<LiveCatalog>, uri: &str) -> Response {
-        super::router(live)
-            .oneshot(Request::get(uri).body(Body::empty()).unwrap())
-            .await
-            .unwrap()
+        send(live, Request::get(uri).body(Body::empty()).unwrap()).await
+    }
+
+    pub async fn send(live: Arc<LiveCatalog>, request: Request<Body>) -> Response {
+        super::router(live).oneshot(request).await.unwrap()
+    }
+
+    /// A same-origin form submission.
+    pub async fn post_form(live: Arc<LiveCatalog>, uri: &str, body: &str) -> Response {
+        let request = Request::post(uri)
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        send(live, request).await
     }
 
     pub async fn body_text(response: Response) -> String {

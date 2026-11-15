@@ -175,3 +175,22 @@ fn validate_cannot_be_combined_with_server_options() {
         .failure()
         .stderr(contains("--port"));
 }
+
+#[test]
+fn validate_without_file_checks_the_whole_catalog() {
+    on_mange_quoi()
+        .args(["--catalog", EXAMPLE_CATALOG, "--validate"])
+        .assert()
+        .success()
+        .stdout(contains("recettes\u{a0}: 6"));
+
+    let dir = example_copy();
+    write(dir.path(), "tags.yml", "tags: [rapide]\n");
+    on_mange_quoi()
+        .arg("--catalog")
+        .arg(dir.path())
+        .arg("--validate")
+        .assert()
+        .failure()
+        .stderr(contains("tag inconnu"));
+}

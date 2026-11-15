@@ -12,6 +12,12 @@
       <header>
         <h1><a href="/" class="contrast">{{ t.app.title }}</a></h1>
         <p>{{ t.app.tagline }}</p>
+        <nav>
+          <ul>
+            <li><a href="/">{{ t.nav.menu }}</a></li>
+            <li><a href="/catalog/recipes">{{ t.nav.catalog }}</a></li>
+          </ul>
+        </nav>
       </header>
       {% if !catalog_errors.is_empty() %}
       <article class="catalog-errors">

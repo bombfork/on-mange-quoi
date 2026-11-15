@@ -18,6 +18,7 @@ pub static MESSAGES: LazyLock<Messages> = LazyLock::new(|| {
 pub struct Messages {
     pub app: AppMessages,
     pub layout: LayoutMessages,
+    pub nav: NavMessages,
     pub landing: LandingMessages,
     pub cli: CliMessages,
     pub catalog: CatalogMessages,
@@ -26,6 +27,7 @@ pub struct Messages {
     pub accepted: AcceptedMessages,
     pub stock: StockMessages,
     pub shopping: ShoppingMessages,
+    pub editor: EditorMessages,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +41,49 @@ pub struct AppMessages {
 #[serde(deny_unknown_fields)]
 pub struct LayoutMessages {
     pub catalog_errors: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NavMessages {
+    pub menu: String,
+    pub catalog: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EditorMessages {
+    pub recipes: String,
+    pub ingredients: String,
+    pub tags: String,
+    pub new_recipe: String,
+    pub edit_recipe: String,
+    pub edit_ingredient: String,
+    pub edit_tag: String,
+    pub name: String,
+    pub staple: String,
+    pub staple_marker: String,
+    pub uses: String,
+    pub used_by: String,
+    pub save: String,
+    pub add: String,
+    pub delete: String,
+    pub cancel: String,
+    pub confirm: String,
+    pub delete_recipe: String,
+    pub delete_recipe_help: String,
+    pub rename: String,
+    pub rename_help: String,
+    pub created: String,
+    pub updated: String,
+    pub deleted: String,
+    pub read_only: String,
+    pub conflict: String,
+    pub not_found: String,
+    pub in_use: String,
+    pub invalid: String,
+    pub io_error: String,
+    pub empty: String,
 }
 
 #[derive(Debug, Deserialize)]

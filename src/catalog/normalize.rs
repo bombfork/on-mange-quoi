@@ -30,7 +30,8 @@ pub fn closest<'a>(name: &str, candidates: impl IntoIterator<Item = &'a str>) ->
         .map(|(_, candidate)| candidate)
 }
 
-fn fold(name: &str) -> String {
+/// Lowercase, without accents, with `'` as the only apostrophe and spaces for hyphens.
+pub(crate) fn fold(name: &str) -> String {
     let mut folded = String::with_capacity(name.len());
     for c in name.chars().flat_map(char::to_lowercase) {
         match c {

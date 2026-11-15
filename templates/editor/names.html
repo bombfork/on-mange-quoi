@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "editor/nav.html" %}
+<h2>{{ heading }}</h2>
+{% if writable %}
+<form method="post" action="{{ add_action }}">
+  <input type="hidden" name="version" value="{{ version }}" />
+  <fieldset role="group">
+    <input type="text" name="name" value="{{ new_name }}" placeholder="{{ t.editor.name }}" aria-label="{{ t.editor.name }}" required />
+    <button type="submit">{{ t.editor.add }}</button>
+  </fieldset>
+  {% if with_staple %}
+  <label><input type="checkbox" name="staple" value="1"{% if new_staple %} checked{% endif %} /> {{ t.editor.staple }}</label>
+  {% endif %}
+</form>
+{% endif %}
+{% if items.is_empty() %}
+<p>{{ t.editor.empty }}</p>
+{% else %}
+<ul>
+  {% for item in items %}
+  <li><a href="{{ item.edit_url }}">{{ item.name }}</a>{% if item.staple %} <small>({{ t.editor.staple_marker }})</small>{% endif %}{% if !item.uses.is_empty() %} <small>{{ item.uses }}</small>{% endif %}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

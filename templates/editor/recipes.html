@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "editor/nav.html" %}
+<h2>{{ t.editor.recipes }}</h2>
+{% if writable %}
+<p><a href="/catalog/recipes/new" role="button">{{ t.editor.new_recipe }}</a></p>
+{% endif %}
+{% if recipes.is_empty() %}
+<p>{{ t.editor.empty }}</p>
+{% else %}
+<ul>
+  {% for recipe in recipes %}
+  <li><a href="/catalog/recipes/{{ recipe.id }}">{{ recipe.name }}</a>{% if !recipe.tags.is_empty() %} <small>{{ recipe.tags }}</small>{% endif %}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

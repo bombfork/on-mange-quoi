@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "editor/nav.html" %}
+<h2>{{ heading }}</h2>
+{% if writable %}
+<form method="post" action="{{ action }}">
+  <input type="hidden" name="version" value="{{ version }}" />
+  <label>
+    {{ t.editor.name }}
+    <input type="text" name="name" value="{{ name }}" required />
+  </label>
+  <fieldset class="choices">
+    <legend>{{ t.editor.ingredients }}</legend>
+    {% for item in ingredients %}
+    <label><input type="checkbox" name="ingredient" value="{{ item.name }}"{% if item.checked %} checked{% endif %} /> {{ item.name }}</label>
+    {% endfor %}
+  </fieldset>
+  {% if !tags.is_empty() %}
+  <fieldset class="choices">
+    <legend>{{ t.editor.tags }}</legend>
+    {% for item in tags %}
+    <label><input type="checkbox" name="tag" value="{{ item.name }}"{% if item.checked %} checked{% endif %} /> {{ item.name }}</label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  <button type="submit">{{ t.editor.save }}</button>
+</form>
+{% if let Some(url) = delete_url %}
+<p><a href="{{ url }}" class="secondary">{{ t.editor.delete }}</a></p>
+{% endif %}
+{% endif %}
+{% endblock %}

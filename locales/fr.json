@@ -6,6 +6,10 @@
   "layout": {
     "catalog_errors": "Le catalogue modifié contient des erreurs\u00a0: la version précédente reste utilisée."
   },
+  "nav": {
+    "menu": "Préparer un menu",
+    "catalog": "Catalogue"
+  },
   "landing": {
     "intro": "Choisir le nombre de repas et les critères\u00a0: l’application propose des menus, vérifie ce qui est déjà en stock, puis prépare la liste de courses.",
     "catalog_summary": "Recettes au catalogue\u00a0: {count}"
@@ -18,7 +22,7 @@
     "catalog_not_a_directory": "Le catalogue doit être un dossier\u00a0: {path}",
     "bind_failed": "Impossible d’écouter sur {address}",
     "listening": "Catalogue {catalog} servi sur http://{address}",
-    "validate": "Valider un fichier d’ingrédients, de tags ou de recette par rapport au catalogue, sans le servir (option répétable)",
+    "validate": "Valider le catalogue sans le servir, ou un fichier d’ingrédients, de tags ou de recette par rapport au catalogue (option répétable)",
     "catalog_loaded": "Catalogue chargé (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
     "catalog_valid": "Catalogue valide (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
     "catalog_invalid": "Catalogue invalide (problèmes\u00a0: {count})",
@@ -83,5 +87,38 @@
     "text_version": "Version texte (à copier ou imprimer)",
     "edit_stock": "Modifier le stock",
     "new_menu": "Préparer un autre menu"
+  },
+  "editor": {
+    "recipes": "Recettes",
+    "ingredients": "Ingrédients",
+    "tags": "Tags",
+    "new_recipe": "Ajouter une recette",
+    "edit_recipe": "Modifier la recette «\u00a0{name}\u00a0»",
+    "edit_ingredient": "Modifier l’ingrédient «\u00a0{name}\u00a0»",
+    "edit_tag": "Modifier le tag «\u00a0{name}\u00a0»",
+    "name": "Nom",
+    "staple": "Produit de base (toujours en stock, jamais demandé)",
+    "staple_marker": "produit de base",
+    "uses": "recettes\u00a0: {count}",
+    "used_by": "Utilisé par\u00a0: {recipes}",
+    "save": "Enregistrer",
+    "add": "Ajouter",
+    "delete": "Supprimer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "delete_recipe": "Supprimer la recette «\u00a0{name}\u00a0»\u202f?",
+    "delete_recipe_help": "La recette sera supprimée du catalogue.",
+    "rename": "Renommer «\u00a0{old}\u00a0» en «\u00a0{new}\u00a0»\u202f?",
+    "rename_help": "Les recettes suivantes seront modifiées aussi\u00a0:",
+    "created": "Ajout enregistré.",
+    "updated": "Modification enregistrée.",
+    "deleted": "Suppression enregistrée.",
+    "read_only": "Catalogue en lecture seule\u00a0: modification impossible depuis l’application.",
+    "conflict": "Le fichier a été modifié entre-temps. Recharger la page et recommencer.",
+    "not_found": "Élément introuvable dans le catalogue.",
+    "in_use": "Suppression impossible, utilisé par les recettes suivantes\u00a0: {recipes}",
+    "invalid": "Modification refusée\u00a0:",
+    "io_error": "Écriture impossible ({error})",
+    "empty": "Aucun élément pour l’instant."
   }
 }

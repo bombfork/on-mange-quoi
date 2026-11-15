@@ -6,8 +6,8 @@ the shopping list.
 
 The user interface is in French. The code and documentation are in English.
 
-> **Status:** early development. The whole flow works, from criteria to shopping list; the in-app
-> catalog editor is still to come.
+> **Status:** early development. The whole flow works, from criteria to shopping list, and the
+> catalog can be edited from the app.
 
 ## How it is meant to work
 
@@ -34,7 +34,9 @@ on-mange-quoi --catalog path/to/catalog --port 8080
 ```
 
 It listens on all interfaces by default (`--host` to restrict it) and has no authentication:
-run it on a trusted local network only.
+run it on a trusted local network only. Edit requests coming from other sites are refused.
+Behind a reverse proxy, browsers that do not send `Sec-Fetch-Site` need the proxy to forward
+the original `Host` header for edits to work.
 
 The catalog layout:
 
@@ -52,9 +54,15 @@ Changes to the catalog files are picked up within a couple of seconds, without a
 modified files are invalid, the previous catalog stays in use and every page shows the errors
 until they are fixed.
 
-To check new or modified files against a catalog without serving it:
+The catalog can also be edited from the app (the "Catalogue" link): recipes, ingredients and
+tags. Edits are checked with the same rules as below before being written; files written by the
+app lose their comments and hand formatting. When the catalog directory is read-only, the editor
+is disabled.
+
+To check a catalog, or new or modified files against it, without serving it:
 
 ```bash
+on-mange-quoi --catalog path/to/catalog --validate
 on-mange-quoi --catalog path/to/catalog --validate new-recipe.yml
 # A new recipe may use ingredients added in the same command:
 on-mange-quoi --catalog path/to/catalog --validate new-recipe.yml --validate ingredients.yml

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "editor/nav.html" %}
+<h2>{{ heading }}</h2>
+{% if !used_by.is_empty() %}
+<p><small>{{ used_by }}</small></p>
+{% endif %}
+{% if writable %}
+<form method="post" action="{{ save_action }}">
+  <input type="hidden" name="version" value="{{ version }}" />
+  <input type="hidden" name="name" value="{{ old_name }}" />
+  <label>
+    {{ t.editor.name }}
+    <input type="text" name="new_name" value="{{ new_name }}" required />
+  </label>
+  {% if with_staple %}
+  <label><input type="checkbox" name="staple" value="1"{% if staple %} checked{% endif %} /> {{ t.editor.staple }}</label>
+  {% endif %}
+  <button type="submit">{{ t.editor.save }}</button>
+</form>
+<form method="post" action="{{ delete_action }}">
+  <input type="hidden" name="version" value="{{ version }}" />
+  <input type="hidden" name="name" value="{{ old_name }}" />
+  <button type="submit" class="secondary outline">{{ t.editor.delete }}</button>
+</form>
+{% endif %}
+<p><a href="{{ list_url }}">{{ t.editor.cancel }}</a></p>
+{% endblock %}

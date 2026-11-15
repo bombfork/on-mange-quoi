@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, bail};
-use clap::Parser;
+use clap::{ArgAction, Parser};
 
 use on_mange_quoi::catalog::{self, Catalog, Problem};
 use on_mange_quoi::i18n::{MESSAGES, interpolate};
@@ -25,22 +25,24 @@ struct Cli {
     #[arg(long, default_value_t = 8080, help = MESSAGES.cli.port.as_str())]
     port: u16,
 
+    // Without a file, validates the catalog as it is.
     #[arg(
         long,
         value_name = "FILE",
+        num_args = 0..=1,
+        action = ArgAction::Append,
         help = MESSAGES.cli.validate.as_str(),
         conflicts_with_all = ["host", "port"],
     )]
-    validate: Vec<PathBuf>,
+    validate: Option<Vec<PathBuf>>,
 }
 
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
-    let result = if cli.validate.is_empty() {
-        serve(cli).await
-    } else {
-        validate(&cli)
+    let result = match &cli.validate {
+        Some(files) => validate(&cli.catalog, files),
+        None => serve(cli).await,
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -51,8 +53,8 @@ async fn main() -> ExitCode {
     }
 }
 
-fn validate(cli: &Cli) -> anyhow::Result<()> {
-    let catalog = load_catalog(&cli.catalog, &cli.validate)?;
+fn validate(dir: &Path, files: &[PathBuf]) -> anyhow::Result<()> {
+    let catalog = load_catalog(dir, files)?;
     println!("{}", summary(&MESSAGES.cli.catalog_valid, &catalog));
     Ok(())
 }

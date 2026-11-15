@@ -1,0 +1,351 @@
+use std::fs;
+use std::path::Path;
+
+use serde::Deserialize;
+use tempfile::TempDir;
+
+use super::*;
+use crate::catalog::ProblemKind;
+
+/// A copy of the example catalog, safe to modify.
+fn example_copy() -> TempDir {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/catalog");
+    let dir = TempDir::new().unwrap();
+    for name in [INGREDIENTS_FILE, TAGS_FILE] {
+        fs::copy(source.join(name), dir.path().join(name)).unwrap();
+    }
+    fs::create_dir(dir.path().join(RECIPES_DIR)).unwrap();
+    for entry in fs::read_dir(source.join(RECIPES_DIR)).unwrap() {
+        let path = entry.unwrap().path();
+        let target = dir.path().join(RECIPES_DIR).join(path.file_name().unwrap());
+        fs::copy(&path, target).unwrap();
+    }
+    dir
+}
+
+fn editor(dir: &TempDir) -> Editor {
+    Editor::new(dir.path().to_path_buf())
+}
+
+fn read(dir: &TempDir, path: impl AsRef<Path>) -> String {
+    fs::read_to_string(dir.path().join(path)).unwrap()
+}
+
+fn input(name: &str, ingredients: &[&str], tags: &[&str]) -> RecipeInput {
+    RecipeInput {
+        name: name.into(),
+        ingredients: ingredients.iter().map(|s| s.to_string()).collect(),
+        tags: tags.iter().map(|s| s.to_string()).collect(),
+    }
+}
+
+fn kinds(error: EditError) -> Vec<ProblemKind> {
+    match error {
+        EditError::Invalid(problems) => problems.into_iter().map(|p| p.kind).collect(),
+        other => panic!("expected Invalid, got {other:?}"),
+    }
+}
+
+/// No temporary or probe file is left behind.
+fn assert_no_hidden_files(dir: &TempDir) {
+    for sub in [dir.path().to_path_buf(), dir.path().join(RECIPES_DIR)] {
+        for entry in fs::read_dir(sub).unwrap() {
+            let name = entry.unwrap().file_name();
+            assert!(
+                !name.to_string_lossy().starts_with('.'),
+                "{name:?} left behind"
+            );
+        }
+    }
+}
+
+#[test]
+fn written_names_parse_back_identically() {
+    #[derive(Deserialize)]
+    struct File {
+        recipe: Entry,
+    }
+    #[derive(Deserialize)]
+    struct Entry {
+        name: String,
+        ingredients: Vec<String>,
+    }
+    let names = [
+        "lait",
+        "huile d'olive",
+        "crème fraîche",
+        "Œufs",
+        "1984",
+        "yes",
+        "Null",
+        "a: b",
+        "#tag",
+        "- x",
+        "\"guillemets\"",
+        "pâtes (sans gluten)",
+        "l’huile",
+    ];
+    let yaml = recipe_yaml(&input("Nom: spécial #1", &names, &[]));
+    let file: File = serde_saphyr::from_str(&yaml).unwrap();
+    assert_eq!(file.recipe.name, "Nom: spécial #1");
+    assert_eq!(file.recipe.ingredients, names);
+}
+
+#[test]
+fn writes_the_documented_layout() {
+    assert_eq!(
+        recipe_yaml(&input(
+            "Croque-monsieur",
+            &["pain de mie", "jambon"],
+            &["rapide"]
+        )),
+        "recipe:\n  name: Croque-monsieur\n  ingredients:\n    - pain de mie\n    - jambon\n  tags:\n    - rapide\n"
+    );
+    assert_eq!(
+        ingredients_yaml(&["lait".into()], &["sel".into()]),
+        "ingredients:\n  - lait\nstaples:\n  - sel\n"
+    );
+    assert_eq!(ingredients_yaml(&[], &[]), "ingredients: []\n");
+    assert_eq!(tags_yaml(&[]), "tags: []\n");
+}
+
+#[test]
+fn slugs_are_lowercase_ascii() {
+    assert_eq!(
+        slug("Coquillettes au jambon mouliné"),
+        "coquillettes-au-jambon-mouline"
+    );
+    assert_eq!(slug("  Œufs brouillés !"), "oeufs-brouilles");
+    assert_eq!(slug("L’omelette"), "l-omelette");
+    assert_eq!(slug("!!!"), "recette");
+}
+
+#[test]
+fn creates_a_recipe_named_after_its_title() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let id = editor
+        .create_recipe(&input(
+            "Jambon beurre",
+            &["pain de mie", "jambon", "beurre"],
+            &["rapide"],
+        ))
+        .unwrap();
+    assert_eq!(id, "jambon-beurre");
+    assert!(read(&dir, recipe_path(&id)).contains("name: Jambon beurre"));
+    assert_eq!(editor.catalog().unwrap().recipes.len(), 7);
+    assert_no_hidden_files(&dir);
+}
+
+#[test]
+fn new_recipe_identifiers_do_not_collide() {
+    let dir = example_copy();
+    let id = editor(&dir)
+        .create_recipe(&input("Ratatouille !", &["courgettes"], &[]))
+        .unwrap();
+    assert_eq!(id, "ratatouille-2");
+}
+
+#[test]
+fn invalid_recipe_is_refused_and_nothing_is_written() {
+    let dir = example_copy();
+    let error = editor(&dir)
+        .create_recipe(&input("Pain perdu", &["pain"], &[]))
+        .unwrap_err();
+    assert!(matches!(
+        kinds(error).as_slice(),
+        [ProblemKind::UnknownIngredient { name, .. }] if name == "pain"
+    ));
+    assert!(!dir.path().join(recipe_path("pain-perdu")).exists());
+
+    let error = editor(&dir)
+        .create_recipe(&input("ratatouille", &["courgettes"], &[]))
+        .unwrap_err();
+    assert!(matches!(
+        kinds(error).as_slice(),
+        [ProblemKind::DuplicateRecipeName { .. }]
+    ));
+}
+
+#[test]
+fn updates_a_recipe_in_place_when_the_version_matches() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let path = recipe_path("ratatouille");
+    let version = editor.version(&path);
+    let updated = input(
+        "Ratatouille niçoise",
+        &["courgettes", "tomates"],
+        &["végétarien"],
+    );
+
+    editor
+        .update_recipe("ratatouille", &version, &updated)
+        .unwrap();
+    assert_eq!(read(&dir, &path), recipe_yaml(&updated));
+
+    // The version shown before the first update is now stale.
+    let error = editor
+        .update_recipe("ratatouille", &version, &input("Autre", &["ail"], &[]))
+        .unwrap_err();
+    assert!(matches!(error, EditError::Conflict));
+    assert_eq!(read(&dir, &path), recipe_yaml(&updated));
+}
+
+#[test]
+fn deletes_a_recipe() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let path = recipe_path("ratatouille");
+    editor
+        .delete_recipe("ratatouille", &editor.version(&path))
+        .unwrap();
+    assert!(!dir.path().join(path).exists());
+    assert!(matches!(
+        editor.delete_recipe("ratatouille", "x"),
+        Err(EditError::NotFound)
+    ));
+}
+
+#[test]
+fn adds_ingredients_and_staples_and_refuses_duplicates() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = || editor.version(Path::new(INGREDIENTS_FILE));
+    editor.add_ingredient(&version(), "pain", false).unwrap();
+    editor.add_ingredient(&version(), "muscade", true).unwrap();
+    let catalog = editor.catalog().unwrap();
+    let last_regular = catalog.ingredients.iter().rfind(|i| !i.staple).unwrap();
+    assert_eq!(last_regular.name, "pain");
+    assert_eq!(catalog.ingredients.last().unwrap().name, "muscade");
+
+    let error = editor
+        .add_ingredient(&version(), "Pates", false)
+        .unwrap_err();
+    assert!(matches!(
+        kinds(error).as_slice(),
+        [ProblemKind::DuplicateIngredient { other, .. }] if other == "pâtes"
+    ));
+}
+
+#[test]
+fn renaming_an_ingredient_renames_it_in_recipes() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = editor.version(Path::new(INGREDIENTS_FILE));
+    editor
+        .update_ingredient(&version, "jambon", "jambon blanc", false)
+        .unwrap();
+    let catalog = editor.catalog().unwrap();
+    let position = |name: &str| catalog.ingredients.iter().position(|i| i.name == name);
+    assert_eq!(position("jambon"), None);
+    assert_eq!(position("jambon blanc"), Some(7), "same place in the list");
+    let croque = catalog
+        .recipes
+        .iter()
+        .find(|r| r.id == "croque-monsieur")
+        .unwrap();
+    assert_eq!(
+        croque.ingredients,
+        ["pain de mie", "jambon blanc", "emmental", "beurre"]
+    );
+}
+
+#[test]
+fn an_ingredient_can_become_a_staple() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = editor.version(Path::new(INGREDIENTS_FILE));
+    editor
+        .update_ingredient(&version, "beurre", "beurre", true)
+        .unwrap();
+    let catalog = editor.catalog().unwrap();
+    let last = catalog.ingredients.last().unwrap();
+    assert_eq!((last.name.as_str(), last.staple), ("beurre", true));
+}
+
+#[test]
+fn a_used_ingredient_cannot_be_deleted() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = || editor.version(Path::new(INGREDIENTS_FILE));
+    let error = editor.delete_ingredient(&version(), "jambon").unwrap_err();
+    let EditError::InUse(recipes) = error else {
+        panic!("expected InUse, got {error:?}");
+    };
+    assert_eq!(
+        recipes,
+        ["Coquillettes au jambon mouliné", "Croque-monsieur"]
+    );
+
+    editor.add_ingredient(&version(), "pain", false).unwrap();
+    editor.delete_ingredient(&version(), "pain").unwrap();
+    assert!(
+        !editor
+            .catalog()
+            .unwrap()
+            .ingredients
+            .iter()
+            .any(|i| i.name == "pain")
+    );
+}
+
+#[test]
+fn tags_can_be_added_renamed_and_deleted() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = || editor.version(Path::new(TAGS_FILE));
+    editor.add_tag(&version(), "hiver").unwrap();
+    editor.update_tag(&version(), "rapide", "express").unwrap();
+    let catalog = editor.catalog().unwrap();
+    assert_eq!(catalog.tags, ["végétarien", "enfants", "express", "hiver"]);
+    let croque = catalog
+        .recipes
+        .iter()
+        .find(|r| r.id == "croque-monsieur")
+        .unwrap();
+    assert_eq!(croque.tags, ["enfants", "express"]);
+
+    assert!(matches!(
+        editor.delete_tag(&version(), "express"),
+        Err(EditError::InUse(_))
+    ));
+    editor.delete_tag(&version(), "hiver").unwrap();
+    assert!(matches!(
+        editor.add_tag(&version(), "Enfant"),
+        Err(EditError::Invalid(_))
+    ));
+}
+
+#[test]
+fn an_invalid_catalog_on_disk_cannot_be_edited() {
+    let dir = example_copy();
+    fs::write(dir.path().join(TAGS_FILE), "tags: [rapide]\n").unwrap();
+    let error = editor(&dir)
+        .create_recipe(&input("Pain", &["beurre"], &[]))
+        .unwrap_err();
+    assert!(matches!(error, EditError::Invalid(_)));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_read_only_catalog_cannot_be_edited() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = example_copy();
+    let set_mode = |mode| {
+        for sub in [dir.path().to_path_buf(), dir.path().join(RECIPES_DIR)] {
+            fs::set_permissions(sub, fs::Permissions::from_mode(mode)).unwrap();
+        }
+    };
+    set_mode(0o555);
+    let editor = editor(&dir);
+    let writable = editor.is_writable();
+    let result = editor.create_recipe(&input("Pain", &["beurre"], &[]));
+    set_mode(0o755);
+    // Permissions do not apply to root: nothing to check then.
+    if writable {
+        return;
+    }
+    assert!(matches!(result, Err(EditError::ReadOnly)));
+}

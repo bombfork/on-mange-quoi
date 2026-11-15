@@ -48,3 +48,17 @@ article.recipe button {
     display: none;
   }
 }
+
+fieldset.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0 1rem;
+}
+
+.editor-errors {
+  border-inline-start: 0.25rem solid var(--pico-del-color);
+}
+
+.editor-errors ul {
+  margin-bottom: 0;
+}

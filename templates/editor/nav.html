@@ -1,0 +1,22 @@
+<nav class="catalog-nav">
+  <ul>
+    <li><a href="/catalog/recipes">{{ t.editor.recipes }}</a></li>
+    <li><a href="/catalog/ingredients">{{ t.editor.ingredients }}</a></li>
+    <li><a href="/catalog/tags">{{ t.editor.tags }}</a></li>
+  </ul>
+</nav>
+{% for notice in notices %}
+<p class="notice">{{ notice }}</p>
+{% endfor %}
+{% if !errors.is_empty() %}
+<article class="editor-errors">
+  <ul>
+    {% for error in errors %}
+    <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+</article>
+{% endif %}
+{% if !writable %}
+<p class="notice">{{ t.editor.read_only }}</p>
+{% endif %}

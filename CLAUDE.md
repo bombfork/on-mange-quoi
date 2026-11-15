@@ -20,8 +20,8 @@ stock with the user, and outputs a shopping list. It is self-hosted on the famil
 network.
 
 Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
-serves the whole main flow: criteria, proposal, rejection, stock check, shopping list. The catalog
-is reloaded when its files change. The in-app editor is not implemented yet.
+serves the whole main flow (criteria, proposal, rejection, stock check, shopping list) and the
+catalog editor. The catalog is reloaded when its files change.
 
 ## Technical decisions
 
@@ -42,10 +42,16 @@ is reloaded when its files change. The in-app editor is not implemented yet.
   interval, so a burst of writes triggers a single reload.
 - The in-app editor writes the YAML files back atomically and refuses to overwrite a file that
   changed since it was read. Written files are normalized: comments and hand formatting are lost.
-  If the data directory is read-only, the editor is disabled.
+  If the data directory is read-only, the editor is disabled. Every edit is validated on a
+  staging copy of the catalog with the same rules as `--validate` before anything is written.
+  Renaming an ingredient or a tag used by recipes rewrites those recipes, after a confirmation
+  page listing them. Renaming a recipe keeps its file name, hence its identifier.
+- Edits are POST forms. POST requests from other sites are refused (`Sec-Fetch-Site`, or
+  `Origin` against `Host` for browsers without it), since there is no authentication.
 - JSON Schemas for the YAML files are generated from the Rust types, for editor autocompletion.
 - Command line:
   - `on-mange-quoi --catalog <dir> --port <port>` serves the catalog.
+  - `on-mange-quoi --catalog <dir> --validate` validates the catalog without serving it.
   - `on-mange-quoi --catalog <dir> --validate <file> [--validate <file>...]` validates
     ingredients or recipe files without serving, with the same code the server uses. The files
     are checked together against the catalog as if they were added to it (or replaced the
@@ -87,6 +93,9 @@ Always use mise tasks, not `cargo` directly.
 - `src/live.rs` - `LiveCatalog`: the served `Snapshot` (catalog plus the problems of the files
   on disk), swapped as a whole under a lock; `spawn_watcher` polls `catalog::fingerprint` in a
   thread and reloads after each settled change.
+- `src/editor.rs` - `Editor`: catalog edits (recipes, ingredients, tags) validated on a staging
+  copy then written atomically, version tokens, YAML writing (plain scalars when unambiguous,
+  JSON-quoted otherwise), recipe identifiers derived from names (`slug`).
 - `src/report.rs` - renders problems in French as `path:line:column : message`. Structural errors
   (unknown key, wrong type) embed the parser's English message.
 - `src/menu.rs` - domain module for steps 1 to 3 of the main flow: `Criteria` (meal count, tag
@@ -106,6 +115,9 @@ Always use mise tasks, not `cargo` directly.
   reload never changes the menu.
 - `src/web/shopping.rs` - pages `/menu/accepted` (accepted menu and stock check),
   `/shopping-list` and `/shopping-list.txt` (plain text, to copy or print).
+- `src/web/editor.rs` - editor pages under `/catalog/` (recipes, ingredients, tags), shown from
+  the catalog on disk; a successful edit reloads the served catalog and redirects with a
+  `notice`. Templates in `templates/editor/`.
 - `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct
   (`deny_unknown_fields`), so templates reference keys as fields checked at compile time.
   `interpolate()` fills `{name}` placeholders. Tests enforce French typography in the locale.
@@ -214,3 +226,7 @@ Rules:
 ### Open questions
 
 - Using the shopping list away from the local network (in the shop) is not solved yet.
+- Picking ingredients in the recipe form (a checkbox grid in catalog order) is to be revisited
+  once the user has tried it.
+- Ingredients can only be reordered (which orders the shopping list) by editing
+  `ingredients.yml` by hand.

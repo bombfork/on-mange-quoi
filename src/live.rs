@@ -37,6 +37,10 @@ impl LiveCatalog {
         }
     }
 
+    pub fn dir(&self) -> &std::path::Path {
+        &self.dir
+    }
+
     pub fn snapshot(&self) -> Snapshot {
         self.current
             .read()

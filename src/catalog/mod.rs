@@ -5,7 +5,7 @@
 //! rendered elsewhere.
 
 mod files;
-mod normalize;
+pub(crate) mod normalize;
 mod validate;
 
 #[cfg(test)]
@@ -187,7 +187,7 @@ fn read_dir(dir: &Path, problems: &mut Vec<Problem>) -> Sources {
 }
 
 /// Entries of the recipes directory, sorted, without hidden files (editor swap files, etc.).
-fn recipe_paths(recipes_dir: &Path) -> io::Result<Vec<PathBuf>> {
+pub(crate) fn recipe_paths(recipes_dir: &Path) -> io::Result<Vec<PathBuf>> {
     let mut paths: Vec<PathBuf> = fs::read_dir(recipes_dir)?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| {
