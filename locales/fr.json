@@ -161,6 +161,7 @@
     "import_example": "Exemple",
     "import_example_yaml": "ingredients:\n  - pain\n  - œufs\n  - lait\nstaples:\n  - sucre\n---\nrecipe:\n  name: Pain perdu\n  ingredients:\n    - pain\n    - œufs\n    - lait\n    - sucre\n  tags:\n    - enfants\n",
     "import_done": "Import enregistré (recettes\u00a0: {recipes}, nouveaux ingrédients\u00a0: {ingredients}).",
+    "import_ingredient_tags": "Tags d’ingrédient complétés\u00a0: {tags}.",
     "import_mapped": "«\u00a0{typed}\u00a0» importé sous la forme «\u00a0{name}\u00a0».",
     "import_empty": "Rien à importer\u00a0: la saisie est vide, ou tout y est déjà au catalogue.",
     "import_invalid": "Import refusé, rien n’a été enregistré\u00a0:",

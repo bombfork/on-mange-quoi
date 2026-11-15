@@ -462,6 +462,17 @@ async fn import_adds_recipes_and_reports_spelling_changes() {
     let body = body_text(response).await;
     assert!(body.contains("Import enregistré (recettes\u{a0}: 1, nouveaux ingrédients\u{a0}: 1)"));
     assert!(body.contains("«\u{a0}Oeufs\u{a0}» importé sous la forme «\u{a0}œufs\u{a0}»"));
+    assert!(!body.contains("Tags d’ingrédient complétés"));
+
+    let yaml = "ingredient_tags:\n  volaille: [poulet]\n";
+    let response = post_form(
+        Arc::clone(&live),
+        "/catalog/import",
+        &form(&[("yaml", yaml)]),
+    )
+    .await;
+    let body = body_text(response).await;
+    assert!(body.contains("Tags d’ingrédient complétés\u{a0}: volaille."));
     assert!(dir.path().join("recipes/pain-perdu.yml").exists());
     assert_eq!(live.snapshot().catalog.recipes.len(), 7);
 }

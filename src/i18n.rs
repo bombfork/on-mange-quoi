@@ -125,6 +125,7 @@ pub struct EditorMessages {
     pub import_example: String,
     pub import_example_yaml: String,
     pub import_done: String,
+    pub import_ingredient_tags: String,
     pub import_mapped: String,
     pub import_empty: String,
     pub import_invalid: String,

@@ -1028,7 +1028,13 @@ pub(super) async fn import(State(state): State<AppState>, Form(pairs): FormPairs
             let mapped = report.mapped.iter().map(|(typed, name)| {
                 interpolate(&m.import_mapped, &[("typed", typed), ("name", name)])
             });
-            let notices = std::iter::once(done).chain(mapped).collect();
+            let tagged = (!report.ingredient_tags.is_empty()).then(|| {
+                interpolate(
+                    &m.import_ingredient_tags,
+                    &[("tags", &report.ingredient_tags.join(", "))],
+                )
+            });
+            let notices = std::iter::once(done).chain(tagged).chain(mapped).collect();
             import_page(&state, String::new(), notices, Vec::new())
         }
         Err(error) => import_page(&state, text, Vec::new(), import_error_messages(&error)),
