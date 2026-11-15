@@ -1,34 +1,39 @@
 [tools]
-node = "24"
-
-[tasks.install]
-description = "Install npm dependencies from the lockfile"
-run = "npm ci"
+rust = "stable"
+"cargo:cargo-edit" = "latest"
 
 [tasks.dev]
-description = "Serve the app on http://localhost:8000 (no caching)"
-run = "npx http-server -p 8000 -c-1"
+description = "Serve the example catalog on http://localhost:8080"
+run = "cargo run -- --catalog examples/catalog --port 8080"
+
+[tasks.fmt]
+description = "Format code"
+run = "cargo fmt"
+
+[tasks."fmt:check"]
+description = "Check code formatting"
+run = "cargo fmt --check"
 
 [tasks.lint]
-description = "Run oxlint"
-run = "npm run lint"
+description = "Run clippy and fix warnings"
+run = "cargo clippy --all-targets --fix --allow-dirty --allow-staged"
 
-[tasks.format]
-description = "Check formatting with oxfmt"
-run = "npm run format"
+[tasks."lint:check"]
+description = "Check for clippy warnings"
+run = "cargo clippy --all-targets -- -D warnings"
 
-[tasks.format-fix]
-description = "Fix formatting with oxfmt"
-run = "npm run format:fix"
+[tasks.build]
+description = "Build the project"
+run = "cargo build"
 
-[tasks.validate-i18n]
-description = "Validate locale files against locales/schema.json"
-run = "npm run validate:i18n"
+[tasks.test]
+description = "Run tests"
+run = "cargo test"
 
-[tasks.test-unit]
-description = "Run unit tests (node --test)"
-run = "npm run test:unit"
+[tasks."deps:update"]
+description = "Update Rust dependencies"
+run = "cargo upgrade --incompatible && cargo update"
 
-[tasks.validate-all]
-description = "Run all checks (lint, format, i18n, unit tests)"
-run = "npm run validate:all"
+[tasks.check]
+description = "Run all checks (format, lint, build, test)"
+depends = ["fmt:check", "lint:check", "build", "test"]

@@ -1,0 +1,10 @@
+recipe:
+  name: Poulet rôti et pommes de terre
+  ingredients:
+    - poulet
+    - pommes de terre
+    - ail
+    - huile
+    - sel
+  tags:
+    - enfants

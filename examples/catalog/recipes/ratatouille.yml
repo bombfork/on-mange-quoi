@@ -1,0 +1,12 @@
+recipe:
+  name: Ratatouille
+  ingredients:
+    - courgettes
+    - aubergines
+    - poivrons
+    - tomates
+    - oignons
+    - ail
+    - huile
+  tags:
+    - végétarien

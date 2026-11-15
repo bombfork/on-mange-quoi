@@ -1,0 +1,10 @@
+recipe:
+  name: Croque-monsieur
+  ingredients:
+    - pain de mie
+    - jambon
+    - emmental
+    - beurre
+  tags:
+    - enfants
+    - rapide

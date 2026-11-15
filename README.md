@@ -1,17 +1,17 @@
 # On mange quoi ?
 
-A meal planner and shopping list helper for families. It suggests meals for a given period,
-checks with you what is already in the cupboard, and produces the shopping list.
+A meal planner and shopping list helper for families, self-hosted on the local network. It
+suggests meals for a given period, checks with you what is already in the cupboard, and produces
+the shopping list.
 
-The user interface is in French first, with an i18n layer ready for other languages. The code
-and documentation are in English.
+The user interface is in French. The code and documentation are in English.
 
-> **Status:** early bootstrap. Only the project skeleton exists so far.
+> **Status:** early bootstrap. The binary serves a landing page; no product feature exists yet.
 
 ## How it is meant to work
 
-1. Choose how many meals to plan and filter by tags (for example *quick*, *kid-friendly*,
-   *vegetarian*): each tag can be required, excluded or ignored.
+1. Choose how many meals to plan and filter by tags (for example *rapide*, *enfants*,
+   *végétarien*): each tag can be required, excluded or ignored.
 2. The app proposes that many distinct recipes. Reject any of them and only the rejected ones
    are replaced.
 3. Once the menu is accepted, the app lists every ingredient needed (each one once), skipping
@@ -22,19 +22,38 @@ Recipes carry no cooking instructions, only a name, a list of ingredients and ta
 come from a shared catalog rather than free text, so "lait" and "du lait" can never become two
 different items.
 
-## Development
+## Usage
 
-Tooling is managed with [mise](https://mise.jdx.dev). There is no build step: the repository
-root is the site, served as static files.
+On mange quoi ? is a single binary that serves a catalog directory of YAML files:
 
 ```bash
-mise run install       # Install npm dependencies
-mise run dev           # Serve on http://localhost:8000
-mise run validate-all  # Lint, format check, locale validation, unit tests
-mise run format-fix    # Apply formatting
+on-mange-quoi --catalog path/to/catalog --port 8080
 ```
 
-Every push to `main` deploys to GitHub Pages.
+It listens on all interfaces by default (`--host` to restrict it) and has no authentication:
+run it on a trusted local network only.
+
+The catalog layout:
+
+```
+catalog/
+  ingredients.yml   # ingredients and pantry staples
+  tags.yml          # tags available to recipes
+  recipes/          # one YAML file per recipe
+```
+
+See [`examples/catalog`](examples/catalog) for a complete example.
+
+## Development
+
+Tooling is managed with [mise](https://mise.jdx.dev).
+
+```bash
+mise run dev     # Serve examples/catalog on http://localhost:8080
+mise run check   # Format check, clippy, build, tests (CI runs the same)
+mise run fmt     # Apply formatting
+mise run lint    # Apply clippy fixes
+```
 
 ## License
 

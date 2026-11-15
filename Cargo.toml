@@ -1,0 +1,27 @@
+[package]
+name = "on-mange-quoi"
+version = "0.1.0"
+edition = "2024"
+description = "Self-hosted family meal planner and shopping list helper"
+authors = ["bombfork"]
+readme = "README.md"
+homepage = "https://github.com/bombfork/on-mange-quoi"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/bombfork/on-mange-quoi"
+keywords = ["meal-planner", "shopping-list", "self-hosted"]
+categories = ["web-programming::http-server"]
+
+[dependencies]
+anyhow = "1"
+askama = "0.16"
+axum = "0.8"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+http-body-util = "0.1"
+predicates = "3"
+tower = { version = "0.5", features = ["util"] }

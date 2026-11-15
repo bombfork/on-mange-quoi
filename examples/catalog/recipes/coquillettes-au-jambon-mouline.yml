@@ -1,0 +1,9 @@
+recipe:
+  name: Coquillettes au jambon mouliné
+  ingredients:
+    - coquillettes
+    - jambon
+    - beurre
+  tags:
+    - enfants
+    - rapide

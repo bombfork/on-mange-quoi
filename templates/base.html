@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ t.app.title }}</title>
+    <link rel="stylesheet" href="/assets/pico.min.css" />
+    <link rel="stylesheet" href="/assets/main.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>{{ t.app.title }}</h1>
+        <p>{{ t.app.tagline }}</p>
+      </header>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

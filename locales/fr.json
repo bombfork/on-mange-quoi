@@ -6,5 +6,14 @@
   "landing": {
     "intro": "Choisir le nombre de repas et les critères : l’application propose des menus, vérifie ce qui est déjà en stock, puis prépare la liste de courses.",
     "status": "Application en cours de construction."
+  },
+  "cli": {
+    "about": "Planificateur de repas familial, hébergé sur le réseau local.",
+    "catalog": "Dossier du catalogue (ingredients.yml, tags.yml, recipes/)",
+    "host": "Adresse d’écoute",
+    "port": "Port d’écoute",
+    "catalog_not_a_directory": "Le catalogue doit être un dossier : {path}",
+    "bind_failed": "Impossible d’écouter sur {address}",
+    "listening": "Catalogue {catalog} servi sur http://{address}"
   }
 }

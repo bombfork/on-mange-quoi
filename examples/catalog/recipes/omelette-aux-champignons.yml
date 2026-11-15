@@ -1,0 +1,11 @@
+recipe:
+  name: Omelette aux champignons
+  ingredients:
+    - œufs
+    - champignons
+    - beurre
+    - sel
+    - poivre
+  tags:
+    - végétarien
+    - rapide

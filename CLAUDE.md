@@ -19,9 +19,8 @@ On mange quoi ? is a meal planner for families: it proposes meals for a period, 
 stock with the user, and outputs a shopping list. It is self-hosted on the family's local
 network.
 
-Current state: the repository still holds the initial vanilla JavaScript skeleton (i18n, landing
-page, tooling, CI, GitHub Pages deployment), which the Rust stack below replaces. No product
-feature is implemented yet.
+Current state: skeleton only. The binary parses `--catalog`, `--host` and `--port` and serves a
+landing page; the catalog is not loaded yet and no product feature is implemented.
 
 ## Technical decisions
 
@@ -55,30 +54,29 @@ feature is implemented yet.
 
 ## Development commands
 
-Always use mise tasks, not `npm`/`npx` directly.
+Always use mise tasks, not `cargo` directly.
 
-- `mise run install` - install npm dependencies (`npm ci`)
-- `mise run dev` - serve on http://localhost:8000 with caching disabled
-- `mise run lint` - oxlint (`--deny-warnings`) on `js/`, `scripts/`, `tests/`
-- `mise run format` / `mise run format-fix` - oxfmt check / fix
-- `mise run validate-i18n` - validate `locales/*.json` against `locales/schema.json`
-- `mise run test-unit` - `node --test` on `tests/**/*.test.js`
-- `mise run validate-all` - all of the above; run before every commit (CI runs the same)
+- `mise run dev` - serve `examples/catalog` on http://localhost:8080
+- `mise run fmt` / `mise run fmt:check` - rustfmt fix / check
+- `mise run lint` / `mise run lint:check` - clippy fix / check (`-D warnings`, all targets)
+- `mise run build` - debug build
+- `mise run test` - unit tests and CLI integration tests
+- `mise run check` - all checks; run before every commit (CI runs the same)
+- `mise run deps:update` - upgrade dependencies (cargo-edit)
 
 ## Architecture
 
-- `index.html` - single page; elements with `data-i18n="key.path"` get their text from the locale.
-- `js/main.js` - entry point.
-- `js/i18n.js` - browser i18n: `initI18n()`, `setLanguage()`, `t(key, params)`,
-  `applyTranslations(root)`. Language priority: `?lang=` URL param, then localStorage, then browser.
-- `js/i18n-core.js` - pure helpers (`lookup`, `interpolate`, `pickLanguage`) with no DOM access,
-  unit-tested under Node.
-- `locales/fr.json` - the only locale for now; `fr` is the default language.
-- `locales/schema.json` - strict schema (`additionalProperties: false`): every new key must be
-  added to the schema and to every locale.
-- `assets/pico.min.css` - vendored Pico CSS v2 (no CDN, so the app works offline and in Capacitor).
-
-Keep domain logic in pure modules without DOM access, so it can be unit-tested with `node --test`.
+- `src/main.rs` - command line (clap) and server startup, graceful shutdown on Ctrl-C/SIGTERM.
+- `src/web.rs` - axum routes; renders askama templates and serves the embedded stylesheets.
+- `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct
+  (`deny_unknown_fields`), so templates reference keys as fields checked at compile time.
+  `interpolate()` fills `{name}` placeholders. Tests enforce French typography in the locale.
+- `templates/` - askama templates; `base.html` is the layout, each page extends it.
+- `locales/fr.json` - the only locale. Every new key must be added to the `Messages` structs.
+- `assets/pico.min.css` - vendored Pico CSS v2, embedded in the binary; `assets/main.css` holds
+  the app's own styles.
+- `examples/catalog/` - example catalog, used by `mise run dev`.
+- `tests/cli.rs` - command-line integration tests (assert_cmd).
 
 ## Product design
 

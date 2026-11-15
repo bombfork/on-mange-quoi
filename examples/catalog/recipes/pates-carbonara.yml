@@ -1,0 +1,11 @@
+recipe:
+  name: Pâtes carbonara
+  ingredients:
+    - pâtes
+    - lardons
+    - œufs
+    - crème fraîche
+    - poivre
+  tags:
+    - enfants
+    - rapide
