@@ -90,7 +90,7 @@ recipe:
 Tooling is managed with [mise](https://mise.jdx.dev).
 
 ```bash
-mise run dev     # Serve examples/catalog on http://localhost:8080
+mise run dev     # Serve a copy of examples/catalog on http://localhost:8080
 mise run check   # Format check, clippy, build, tests (CI runs the same)
 mise run fmt     # Apply formatting
 mise run lint    # Apply clippy fixes

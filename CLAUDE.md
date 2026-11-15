@@ -66,7 +66,8 @@ catalog editor. The catalog is reloaded when its files change.
 
 Always use mise tasks, not `cargo` directly.
 
-- `mise run dev` - serve `examples/catalog` on http://localhost:8080
+- `mise run dev` - serve a copy of `examples/catalog` on http://localhost:8080; the copy
+  (`target/dev-catalog`, created on first run) is what the editor modifies
 - `mise run fmt` / `mise run fmt:check` - rustfmt fix / check
 - `mise run lint` / `mise run lint:check` - clippy fix / check (`-D warnings`, all targets)
 - `mise run build` - debug build
@@ -125,7 +126,7 @@ Always use mise tasks, not `cargo` directly.
 - `locales/fr.json` - the only locale. Every new key must be added to the `Messages` structs.
 - `assets/pico.min.css` - vendored Pico CSS v2, embedded in the binary; `assets/main.css` holds
   the app's own styles.
-- `examples/catalog/` - example catalog, used by `mise run dev`.
+- `examples/catalog/` - example catalog, used by tests; `mise run dev` serves a copy of it.
 - `schemas/` - JSON Schemas of the catalog files, generated from the serde types.
 - `tests/cli.rs` - command-line integration tests (assert_cmd).
 

@@ -3,8 +3,11 @@ rust = "stable"
 "cargo:cargo-edit" = "latest"
 
 [tasks.dev]
-description = "Serve the example catalog on http://localhost:8080"
-run = "cargo run -- --catalog examples/catalog --port 8080"
+description = "Serve a copy of the example catalog (target/dev-catalog) on http://localhost:8080"
+run = """
+[ -d target/dev-catalog ] || { mkdir -p target && cp -r examples/catalog target/dev-catalog; }
+cargo run -- --catalog target/dev-catalog --port 8080
+"""
 
 [tasks.fmt]
 description = "Format code"
