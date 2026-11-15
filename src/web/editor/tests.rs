@@ -439,3 +439,49 @@ async fn read_only_catalog_disables_the_editor() {
     assert!(body.contains(&MESSAGES.editor.read_only));
     assert!(!body.contains(&MESSAGES.editor.new_recipe));
 }
+
+#[tokio::test]
+async fn import_page_explains_the_format() {
+    let (_dir, live) = served_copy();
+    let body = page(&live, "/catalog/import").await;
+    assert!(body.contains(r#"<textarea name="yaml""#));
+    assert!(body.contains("name: Pain perdu"), "example shown");
+}
+
+#[tokio::test]
+async fn import_adds_recipes_and_reports_spelling_changes() {
+    let (dir, live) = served_copy();
+    let yaml = "ingredients:\r\n  - pain\r\n  - Oeufs\r\n---\r\nrecipe:\r\n  name: Pain perdu\r\n  ingredients: [pain, œufs, lait]\r\n";
+    let response = post_form(
+        Arc::clone(&live),
+        "/catalog/import",
+        &form(&[("yaml", yaml)]),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_text(response).await;
+    assert!(body.contains("Import enregistré (recettes\u{a0}: 1, nouveaux ingrédients\u{a0}: 1)"));
+    assert!(body.contains("«\u{a0}Oeufs\u{a0}» importé sous la forme «\u{a0}œufs\u{a0}»"));
+    assert!(dir.path().join("recipes/pain-perdu.yml").exists());
+    assert_eq!(live.snapshot().catalog.recipes.len(), 7);
+}
+
+#[tokio::test]
+async fn refused_import_keeps_the_text_and_locates_errors() {
+    let (dir, live) = served_copy();
+    let yaml = "recipe:\n  name: Pain perdu\n  ingredients:\n    - pain\n";
+    let response = post_form(
+        Arc::clone(&live),
+        "/catalog/import",
+        &form(&[("yaml", yaml)]),
+    )
+    .await;
+    let body = body_text(response).await;
+    assert!(body.contains(&MESSAGES.editor.import_invalid));
+    assert!(body.contains("Ligne 4\u{a0}: ingrédient inconnu\u{a0}: «\u{a0}pain\u{a0}»"));
+    assert!(
+        body.contains("    - pain\n</textarea>"),
+        "text kept as typed"
+    );
+    assert!(!dir.path().join("recipes/pain-perdu.yml").exists());
+}

@@ -126,6 +126,17 @@
     "replace_with": "Remplacer par «\u00a0{name}\u00a0»",
     "mapped": "«\u00a0{typed}\u00a0» ajouté sous la forme «\u00a0{name}\u00a0», déjà au catalogue.",
     "new_help": "Les ingrédients marqués «\u00a0nouveau\u00a0» seront ajoutés au catalogue à l’enregistrement.",
-    "no_ingredient": "Aucun ingrédient pour l’instant."
+    "no_ingredient": "Aucun ingrédient pour l’instant.",
+    "import": "Importer",
+    "import_help": "Coller un ou plusieurs documents YAML, séparés par une ligne «\u00a0---\u00a0»\u00a0: des ingrédients (listes «\u00a0ingredients\u00a0», et «\u00a0staples\u00a0» pour les produits de base) ou une recette (clé «\u00a0recipe\u00a0»). Les ingrédients déjà au catalogue sont ignorés. Une recette ne peut utiliser que des ingrédients du catalogue ou déclarés dans la saisie. En cas d’erreur, rien n’est enregistré.",
+    "import_example": "Exemple",
+    "import_example_yaml": "ingredients:\n  - pain\n  - œufs\n  - lait\nstaples:\n  - sucre\n---\nrecipe:\n  name: Pain perdu\n  ingredients:\n    - pain\n    - œufs\n    - lait\n    - sucre\n  tags:\n    - enfants\n",
+    "import_done": "Import enregistré (recettes\u00a0: {recipes}, nouveaux ingrédients\u00a0: {ingredients}).",
+    "import_mapped": "«\u00a0{typed}\u00a0» importé sous la forme «\u00a0{name}\u00a0».",
+    "import_empty": "Rien à importer\u00a0: la saisie est vide, ou tout y est déjà au catalogue.",
+    "import_invalid": "Import refusé, rien n’a été enregistré\u00a0:",
+    "import_line": "Ligne {line}\u00a0: {message}",
+    "import_unknown_key": "clé inconnue «\u00a0{key}\u00a0», clés attendues\u00a0: «\u00a0ingredients\u00a0», «\u00a0staples\u00a0» ou «\u00a0recipe\u00a0»",
+    "import_mixed": "un document contient soit des ingrédients, soit une recette, pas les deux"
   }
 }

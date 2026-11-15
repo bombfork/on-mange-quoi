@@ -91,6 +91,17 @@ pub struct EditorMessages {
     pub mapped: String,
     pub new_help: String,
     pub no_ingredient: String,
+    pub import: String,
+    pub import_help: String,
+    pub import_example: String,
+    pub import_example_yaml: String,
+    pub import_done: String,
+    pub import_mapped: String,
+    pub import_empty: String,
+    pub import_invalid: String,
+    pub import_line: String,
+    pub import_unknown_key: String,
+    pub import_mixed: String,
 }
 
 #[derive(Debug, Deserialize)]

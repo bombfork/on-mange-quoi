@@ -14,7 +14,9 @@ use super::flow::{Field, encode};
 use super::{AppState, Pairs, catalog_errors, render};
 use crate::catalog::normalize::{closest, normalize};
 use crate::catalog::{Catalog, INGREDIENTS_FILE, TAGS_FILE};
-use crate::editor::{EditError, RecipeInput, recipe_path, recipes_using};
+use crate::editor::{
+    EditError, ImportError, ImportProblemKind, RecipeInput, recipe_path, recipes_using,
+};
 use crate::i18n::{MESSAGES, Messages, interpolate};
 use crate::report;
 
@@ -883,6 +885,98 @@ pub(super) async fn delete_ingredient(
 
 pub(super) async fn delete_tag(State(state): State<AppState>, Form(pairs): FormPairs) -> Response {
     delete_name(&state, Kind::Tag, &pairs)
+}
+
+// Raw YAML import
+
+#[derive(Template)]
+#[template(path = "editor/import.html")]
+struct ImportPage {
+    t: &'static Messages,
+    catalog_errors: Vec<String>,
+    notices: Vec<String>,
+    errors: Vec<String>,
+    writable: bool,
+    text: String,
+}
+
+fn import_page(
+    state: &AppState,
+    text: String,
+    notices: Vec<String>,
+    errors: Vec<String>,
+) -> Response {
+    render(&ImportPage {
+        t: &MESSAGES,
+        catalog_errors: catalog_errors(&state.live.snapshot()),
+        notices,
+        errors,
+        writable: state.editor.is_writable(),
+        text,
+    })
+}
+
+fn import_error_messages(error: &ImportError) -> Vec<String> {
+    let m = &MESSAGES.editor;
+    match error {
+        ImportError::Empty => vec![m.import_empty.clone()],
+        ImportError::Edit(error) => error_messages(error),
+        ImportError::Invalid(problems) => {
+            let lines = problems.iter().map(|problem| {
+                let message = match &problem.kind {
+                    ImportProblemKind::Syntax(error) => {
+                        interpolate(&MESSAGES.catalog.syntax, &[("error", error)])
+                    }
+                    ImportProblemKind::UnknownKey(key) => {
+                        interpolate(&m.import_unknown_key, &[("key", key)])
+                    }
+                    ImportProblemKind::Mixed => m.import_mixed.clone(),
+                    ImportProblemKind::Catalog(kind) => report::message(kind),
+                };
+                match problem.line {
+                    Some(line) => {
+                        interpolate(&m.import_line, &[("line", &line), ("message", &message)])
+                    }
+                    None => message,
+                }
+            });
+            std::iter::once(m.import_invalid.clone())
+                .chain(lines)
+                .collect()
+        }
+    }
+}
+
+pub(super) async fn import_form(State(state): State<AppState>) -> Response {
+    import_page(&state, String::new(), Vec::new(), Vec::new())
+}
+
+pub(super) async fn import(State(state): State<AppState>, Form(pairs): FormPairs) -> Response {
+    // Not trimmed: error lines must match the text as typed.
+    let text = pairs
+        .iter()
+        .find(|(key, _)| key == "yaml")
+        .map(|(_, value)| value.clone())
+        .unwrap_or_default();
+    match state.editor.import(&text) {
+        Ok(report) => {
+            state.live.reload();
+            let m = &MESSAGES.editor;
+            let done = interpolate(
+                &m.import_done,
+                &[
+                    ("recipes", &report.recipes.len()),
+                    ("ingredients", &report.new_ingredients.len()),
+                ],
+            );
+            let mapped = report.mapped.iter().map(|(typed, name)| {
+                interpolate(&m.import_mapped, &[("typed", typed), ("name", name)])
+            });
+            let notices = std::iter::once(done).chain(mapped).collect();
+            import_page(&state, String::new(), notices, Vec::new())
+        }
+        Err(error) => import_page(&state, text, Vec::new(), import_error_messages(&error)),
+    }
 }
 
 #[cfg(test)]

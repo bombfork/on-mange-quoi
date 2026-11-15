@@ -377,3 +377,177 @@ fn a_read_only_catalog_cannot_be_edited() {
     }
     assert!(matches!(result, Err(EditError::ReadOnly)));
 }
+
+mod import {
+    use super::*;
+    use crate::editor::{ImportError, ImportProblem, ImportProblemKind, ImportReport};
+
+    fn problems(error: ImportError) -> Vec<ImportProblem> {
+        match error {
+            ImportError::Invalid(problems) => problems,
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+    }
+
+    const PAIN_PERDU: &str = "\
+ingredients:
+  - pain
+  - Oeufs
+  - lait
+  - cannelle
+staples:
+  - sel
+  - sucre
+---
+recipe:
+  name: Pain perdu
+  ingredients:
+    - pain
+    - oeufs
+    - lait
+    - cannelle
+    - sucre
+  tags:
+    - Enfants
+";
+
+    #[test]
+    fn imports_ingredients_and_recipes_and_skips_known_names() {
+        let dir = example_copy();
+        let editor = editor(&dir);
+        let report = editor.import(PAIN_PERDU).unwrap();
+        assert_eq!(
+            report,
+            ImportReport {
+                recipes: vec!["Pain perdu".into()],
+                new_ingredients: vec!["pain".into(), "cannelle".into(), "sucre".into()],
+                mapped: vec![
+                    ("Oeufs".into(), "œufs".into()),
+                    ("oeufs".into(), "œufs".into()),
+                    ("Enfants".into(), "enfants".into()),
+                ],
+            }
+        );
+        let catalog = editor.catalog().unwrap();
+        let sucre = catalog
+            .ingredients
+            .iter()
+            .find(|i| i.name == "sucre")
+            .unwrap();
+        assert!(sucre.staple);
+        let recipe = catalog
+            .recipes
+            .iter()
+            .find(|r| r.id == "pain-perdu")
+            .unwrap();
+        assert_eq!(
+            recipe.ingredients,
+            ["pain", "œufs", "lait", "cannelle", "sucre"]
+        );
+        assert_eq!(recipe.tags, ["enfants"]);
+        assert_no_hidden_files(&dir);
+    }
+
+    #[test]
+    fn several_recipes_in_one_input() {
+        let dir = example_copy();
+        let input = "\
+recipe:
+  name: Tartines
+  ingredients: [pain de mie, beurre]
+---
+recipe:
+  name: Omelette nature
+  ingredients: [œufs, sel]
+";
+        let report = editor(&dir).import(input).unwrap();
+        assert_eq!(report.recipes, ["Tartines", "Omelette nature"]);
+        assert!(report.new_ingredients.is_empty());
+        assert!(dir.path().join(recipe_path("omelette-nature")).exists());
+    }
+
+    #[test]
+    fn undeclared_ingredients_are_refused_with_their_line() {
+        let dir = example_copy();
+        let before = read(&dir, INGREDIENTS_FILE);
+        let input = "\
+ingredients: [cannelle]
+---
+recipe:
+  name: Pain perdu
+  ingredients:
+    - pain
+    - cannelle
+";
+        let problems = problems(editor(&dir).import(input).unwrap_err());
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].line, Some(6));
+        assert!(matches!(
+            &problems[0].kind,
+            ImportProblemKind::Catalog(ProblemKind::UnknownIngredient { name, .. }) if name == "pain"
+        ));
+        assert_eq!(read(&dir, INGREDIENTS_FILE), before, "nothing written");
+        assert!(!dir.path().join(recipe_path("pain-perdu")).exists());
+    }
+
+    #[test]
+    fn known_recipe_names_are_refused() {
+        let dir = example_copy();
+        let input = "recipe:\n  name: ratatouille\n  ingredients: [courgettes]\n";
+        let problems = problems(editor(&dir).import(input).unwrap_err());
+        assert!(matches!(
+            problems.as_slice(),
+            [ImportProblem {
+                line: Some(2),
+                kind: ImportProblemKind::Catalog(ProblemKind::DuplicateRecipeName { .. })
+            }]
+        ));
+    }
+
+    #[test]
+    fn unknown_keys_mixed_documents_and_syntax_errors_are_located() {
+        let dir = example_copy();
+        let editor = editor(&dir);
+        let problems_of = |input: &str| problems(editor.import(input).unwrap_err());
+
+        assert_eq!(
+            problems_of("ingredients: [pain]\n---\ntags: [hiver]\n"),
+            [ImportProblem {
+                line: Some(3),
+                kind: ImportProblemKind::UnknownKey("tags".into())
+            }]
+        );
+        assert_eq!(
+            problems_of("ingredients: [pain]\nrecipe:\n  name: X\n  ingredients: [pain]\n"),
+            [ImportProblem {
+                line: Some(1),
+                kind: ImportProblemKind::Mixed
+            }]
+        );
+        assert!(matches!(
+            problems_of("recipe:\n  name: [x\n").as_slice(),
+            [ImportProblem {
+                line: Some(2),
+                kind: ImportProblemKind::Syntax(_)
+            }]
+        ));
+        assert!(matches!(
+            problems_of("ingredients:\n  - ''\n").as_slice(),
+            [ImportProblem {
+                line: Some(2),
+                kind: ImportProblemKind::Catalog(ProblemKind::EmptyName)
+            }]
+        ));
+    }
+
+    #[test]
+    fn empty_input_imports_nothing() {
+        let dir = example_copy();
+        for input in ["", "# rien\n", "---\n---\n", "ingredients: [œufs, lait]\n"] {
+            assert!(
+                matches!(editor(&dir).import(input), Err(ImportError::Empty)),
+                "{input:?}"
+            );
+        }
+    }
+}

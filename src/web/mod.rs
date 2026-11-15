@@ -65,6 +65,10 @@ pub fn router(live: Arc<LiveCatalog>) -> Router {
             "/catalog/ingredients/delete",
             axum::routing::post(editor::delete_ingredient),
         )
+        .route(
+            "/catalog/import",
+            get(editor::import_form).post(editor::import),
+        )
         .route("/catalog/tags", get(editor::tags))
         .route("/catalog/tags/new", axum::routing::post(editor::add_tag))
         .route(

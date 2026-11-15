@@ -6,6 +6,7 @@
 //! overwriting a file changed in the meantime. Written files are normalized: comments and hand
 //! formatting are lost.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -96,21 +97,7 @@ impl Editor {
     pub fn create_recipe(&self, input: &RecipeInput) -> Result<String, EditError> {
         let _guard = self.lock();
         let catalog = self.catalog()?;
-        let base = slug(&input.name);
-        let taken = |id: &str| {
-            catalog.recipes.iter().any(|recipe| recipe.id == id)
-                || self.dir.join(recipe_path(id)).exists()
-        };
-        let id = (1..)
-            .map(|n| {
-                if n == 1 {
-                    base.clone()
-                } else {
-                    format!("{base}-{n}")
-                }
-            })
-            .find(|id| !taken(id))
-            .expect("an unused identifier exists");
+        let id = self.unused_id(&catalog, &input.name, &HashSet::new());
         self.apply(&[], recipe_changes(&catalog, &id, input))?;
         Ok(id)
     }
@@ -311,6 +298,27 @@ impl Editor {
                 content: Some(tags_yaml(&tags)),
             }],
         )
+    }
+
+    /// A recipe identifier derived from `name`, used neither by the catalog, nor by a file of
+    /// the recipes directory, nor in `reserved`.
+    fn unused_id(&self, catalog: &Catalog, name: &str, reserved: &HashSet<String>) -> String {
+        let base = slug(name);
+        let taken = |id: &str| {
+            reserved.contains(id)
+                || catalog.recipes.iter().any(|recipe| recipe.id == id)
+                || self.dir.join(recipe_path(id)).exists()
+        };
+        (1..)
+            .map(|n| {
+                if n == 1 {
+                    base.clone()
+                } else {
+                    format!("{base}-{n}")
+                }
+            })
+            .find(|id| !taken(id))
+            .expect("an unused identifier exists")
     }
 
     fn lock(&self) -> MutexGuard<'_, ()> {
@@ -557,6 +565,10 @@ fn scalar(value: &str) -> String {
         serde_json::to_string(value).expect("strings always serialize")
     }
 }
+
+mod import;
+
+pub use import::{ImportError, ImportProblem, ImportProblemKind, ImportReport};
 
 #[cfg(test)]
 mod tests;

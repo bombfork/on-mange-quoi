@@ -52,6 +52,13 @@ catalog editor. The catalog is reloaded when its files change.
   catalog name (normalization) is added as that name; any other unknown name is marked new,
   with a button to replace it by the closest catalog name when there is one, and new
   ingredients are added to the catalog when the recipe is saved, in the same validated edit.
+- Raw YAML import (`/catalog/import`): one text area, any number of YAML documents separated by
+  `---`, each either ingredients (`ingredients` and/or `staples`, as in `ingredients.yml`) or one
+  recipe (`recipe`, as in a recipe file). The whole input is accepted or refused, with errors
+  located by line in the text area. Ingredients already in the catalog are skipped; names that
+  only differ by spelling from a known name are imported as that name and reported. A recipe may
+  only use ingredients from the catalog or declared in the input. Meant to receive the output
+  of the recipe extraction skill published in `bombfork/claude-marketplace`.
 - Edits are POST forms. POST requests from other sites are refused (`Sec-Fetch-Site`, or
   `Origin` against `Host` for browsers without it), since there is no authentication.
 - JSON Schemas for the YAML files are generated from the Rust types, for editor autocompletion.
@@ -117,6 +124,9 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
 - `src/editor.rs` - `Editor`: catalog edits (recipes, ingredients, tags) validated on a staging
   copy then written atomically, version tokens, YAML writing (plain scalars when unambiguous,
   JSON-quoted otherwise), recipe identifiers derived from names (`slug`).
+- `src/editor/import.rs` - `Editor::import`: parses the documents (top-level keys first, for
+  located errors), resolves names against the catalog and the input, then applies the changes
+  through the same staging validation; problems are mapped back to input lines.
 - `src/report.rs` - renders problems in French as `path:line:column : message`. Structural errors
   (unknown key, wrong type) embed the parser's English message.
 - `src/menu.rs` - domain module for steps 1 to 3 of the main flow: `Criteria` (meal count, tag
@@ -136,7 +146,7 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
   reload never changes the menu.
 - `src/web/shopping.rs` - pages `/menu/accepted` (accepted menu and stock check),
   `/shopping-list` and `/shopping-list.txt` (plain text, to copy or print).
-- `src/web/editor.rs` - editor pages under `/catalog/` (recipes, ingredients, tags), shown from
+- `src/web/editor.rs` - editor pages under `/catalog/` (recipes, ingredients, tags, import), shown from
   the catalog on disk; a successful edit reloads the served catalog and redirects with a
   `notice`. Templates in `templates/editor/`.
 - `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct

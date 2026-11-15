@@ -73,7 +73,8 @@ until they are fixed.
 
 The catalog can also be edited from the app (the "Catalogue" link): recipes, ingredients and
 tags. In the recipe form, ingredients are found with a search field, and a new ingredient can be
-typed there: it is added to the catalog when the recipe is saved. Edits are checked with the same rules as below before being written; files written by the
+typed there: it is added to the catalog when the recipe is saved. Several recipes and
+ingredients can also be imported at once by pasting raw YAML documents (the "Importer" page). Edits are checked with the same rules as below before being written; files written by the
 app lose their comments and hand formatting. When the catalog directory is read-only, the editor
 is disabled.
 

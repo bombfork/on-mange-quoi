@@ -23,7 +23,8 @@ pub fn describe(problem: &Problem) -> String {
     )
 }
 
-fn message(kind: &ProblemKind) -> String {
+/// The message alone, without location.
+pub fn message(kind: &ProblemKind) -> String {
     let m = &MESSAGES.catalog;
     match kind {
         ProblemKind::Unreadable(error) => interpolate(&m.unreadable, &[("error", error)]),

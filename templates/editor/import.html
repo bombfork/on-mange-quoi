@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "editor/nav.html" %}
+<h2>{{ t.editor.import }}</h2>
+<p>{{ t.editor.import_help }}</p>
+<details>
+  <summary>{{ t.editor.import_example }}</summary>
+  <pre><code>{{ t.editor.import_example_yaml }}</code></pre>
+</details>
+{% if writable %}
+<form method="post" action="/catalog/import">
+  <textarea name="yaml" rows="16" class="yaml-input" spellcheck="false" aria-label="{{ t.editor.import }}">{{ text }}</textarea>
+  <button type="submit">{{ t.editor.import }}</button>
+</form>
+{% endif %}
+{% endblock %}
