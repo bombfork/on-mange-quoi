@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ t.shopping.heading }}</h2>
+{% if list.items.is_empty() %}
+<p>{{ t.shopping.empty }}</p>
+{% else %}
+<ul>
+  {% for item in list.items %}
+  <li>{{ item }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if !list.menu.is_empty() %}
+<h3>{{ t.shopping.menu }}</h3>
+<ul>
+  {% for name in list.menu %}
+  <li>{{ name }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<div class="actions">
+  <p><a href="/shopping-list.txt?{{ list.query }}">{{ t.shopping.text_version }}</a></p>
+  <p><a href="/menu/accepted?{{ list.query }}">{{ t.shopping.edit_stock }}</a></p>
+  <p><a href="/">{{ t.shopping.new_menu }}</a></p>
+</div>
+{% endblock %}

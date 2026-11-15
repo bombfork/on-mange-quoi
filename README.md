@@ -6,8 +6,8 @@ the shopping list.
 
 The user interface is in French. The code and documentation are in English.
 
-> **Status:** early development. Menus can be proposed and adjusted; the stock check and the
-> shopping list are not implemented yet.
+> **Status:** early development. The whole flow works, from criteria to shopping list; hot reload
+> of the catalog and the in-app editor are still to come.
 
 ## How it is meant to work
 
@@ -17,7 +17,9 @@ The user interface is in French. The code and documentation are in English.
    are replaced.
 3. Once the menu is accepted, the app lists every ingredient needed (each one once), skipping
    pantry staples that are always in stock. Tick what you already have.
-4. The app returns the shopping list, and the menu if you want it.
+4. The app returns the shopping list, and the menu if you want it, also as plain text to copy
+   or print. The list follows the order of the ingredients file, so you can group ingredients
+   by shop aisle there.
 
 Recipes carry no cooking instructions, only a name, a list of ingredients and tags. Ingredients
 come from a shared catalog rather than free text, so "lait" and "du lait" can never become two

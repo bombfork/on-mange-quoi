@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ t.accepted.heading }}</h2>
+<ul>
+  {% for recipe in recipes %}
+  <li>{{ recipe.name }}</li>
+  {% endfor %}
+</ul>
+<p class="actions"><a href="/menu?{{ menu_query }}">{{ t.accepted.edit }}</a></p>
+
+<form method="get" action="/shopping-list">
+  <h2>{{ t.stock.heading }}</h2>
+  {% for field in fields %}
+  <input type="hidden" name="{{ field.name }}" value="{{ field.value }}" />
+  {% endfor %}
+  {% if ingredients.is_empty() %}
+  <p>{{ t.stock.nothing_to_check }}</p>
+  {% else %}
+  <p>{{ t.stock.help }}</p>
+  <fieldset>
+    {% for ingredient in ingredients %}
+    <label><input type="checkbox" name="in_stock" value="{{ ingredient.name }}"{% if ingredient.in_stock %} checked{% endif %} /> {{ ingredient.name }}</label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  <input type="hidden" name="with_menu" value="0" />
+  <label><input type="checkbox" role="switch" name="with_menu" value="1"{% if with_menu %} checked{% endif %} /> {{ t.stock.with_menu }}</label>
+  <button type="submit">{{ t.stock.submit }}</button>
+</form>
+{% endblock %}

@@ -20,8 +20,8 @@ stock with the user, and outputs a shopping list. It is self-hosted on the famil
 network.
 
 Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
-serves the main flow up to the accepted menu (criteria, proposal, rejection). The stock check and
-the shopping list are not implemented yet.
+serves the whole main flow: criteria, proposal, rejection, stock check, shopping list. Hot reload
+of the catalog and the in-app editor are not implemented yet.
 
 ## Technical decisions
 
@@ -86,12 +86,18 @@ Always use mise tasks, not `cargo` directly.
   filters), `Menu` (proposed and rejected recipe identifiers) and `Menu::update`, which drops
   recipes that left the catalog, replaces a rejected recipe in place and fills empty slots. The
   random source (`fastrand::Rng`) is a parameter, seeded in tests.
+- `src/shopping.rs` - domain module for steps 4 and 5: ingredients to check (union of the menu's
+  ingredients, without staples, in catalog order) and the shopping list.
 - `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. The loaded catalog
   is shared through the router state.
-- `src/web/menu.rs` - pages `/` (criteria form), `/menu` (proposal) and `/menu/accepted`. The
-  flow state is in the query string (`meals`, `tag:<name>=required|excluded`, repeated `proposed`
-  and `rejected`); actions (`reject=<id>`, first proposal, catalog changes) answer with a 303
-  redirect to the URL of the new state, so a reload never changes the menu.
+- `src/web/flow.rs` - the flow state as carried by query strings, shared by every page:
+  `meals`, `tag:<name>=required|excluded`, repeated `proposed`, `rejected` and `in_stock`,
+  `with_menu=0|1` (a hidden `0` precedes the checkbox, the last value wins).
+- `src/web/menu.rs` - pages `/` (criteria form) and `/menu` (proposal). Actions (`reject=<id>`,
+  first proposal, catalog changes) answer with a 303 redirect to the URL of the new state, so a
+  reload never changes the menu.
+- `src/web/shopping.rs` - pages `/menu/accepted` (accepted menu and stock check),
+  `/shopping-list` and `/shopping-list.txt` (plain text, to copy or print).
 - `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct
   (`deny_unknown_fields`), so templates reference keys as fields checked at compile time.
   `interpolate()` fills `{name}` placeholders. Tests enforce French typography in the locale.
@@ -129,6 +135,8 @@ Always use mise tasks, not `cargo` directly.
 - Pantry staples (salt, oil, etc.) are always in stock. They are never asked about in the stock
   check.
 - No persistent inventory: stock is checked each time a menu is accepted.
+- The stock check and the shopping list follow the order of `ingredients.yml`, so grouping
+  ingredients by shop aisle in that file groups the list too.
 - Tags form an extensible catalog. Defaults: `végétarien`, `enfants`, `rapide`. A tag used by a
   recipe cannot be removed.
 - The app includes a module to create, edit and delete recipes, ingredients and tags.

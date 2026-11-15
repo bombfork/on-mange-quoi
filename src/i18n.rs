@@ -23,6 +23,8 @@ pub struct Messages {
     pub plan: PlanMessages,
     pub menu: MenuMessages,
     pub accepted: AcceptedMessages,
+    pub stock: StockMessages,
+    pub shopping: ShoppingMessages,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,7 +38,6 @@ pub struct AppMessages {
 #[serde(deny_unknown_fields)]
 pub struct LandingMessages {
     pub intro: String,
-    pub status: String,
     pub catalog_summary: String,
 }
 
@@ -86,6 +87,27 @@ pub struct MenuMessages {
 pub struct AcceptedMessages {
     pub heading: String,
     pub edit: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StockMessages {
+    pub heading: String,
+    pub help: String,
+    pub nothing_to_check: String,
+    pub with_menu: String,
+    pub submit: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ShoppingMessages {
+    pub heading: String,
+    pub empty: String,
+    pub menu: String,
+    pub text_version: String,
+    pub edit_stock: String,
+    pub new_menu: String,
 }
 
 /// Catalog problems, rendered by `report::describe`.

@@ -1,11 +1,14 @@
 //! HTTP routes. Pages are rendered on the server; static assets are embedded in the binary.
 
+mod flow;
 mod menu;
+mod shopping;
 
 use std::sync::Arc;
 
 use askama::Template;
 use axum::Router;
+use axum::extract::Query;
 use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
@@ -14,6 +17,9 @@ use crate::catalog::Catalog;
 
 const PICO_CSS: &str = include_str!("../../assets/pico.min.css");
 const MAIN_CSS: &str = include_str!("../../assets/main.css");
+
+/// Query string as ordered pairs, keeping repeated keys.
+type Pairs = Query<Vec<(String, String)>>;
 
 #[derive(Clone)]
 struct AppState {
@@ -24,7 +30,9 @@ pub fn router(catalog: Arc<Catalog>) -> Router {
     Router::new()
         .route("/", get(menu::plan))
         .route("/menu", get(menu::proposal))
-        .route("/menu/accepted", get(menu::accepted))
+        .route("/menu/accepted", get(shopping::stock_check))
+        .route("/shopping-list", get(shopping::shopping_list))
+        .route("/shopping-list.txt", get(shopping::shopping_list_text))
         .route("/assets/pico.min.css", get(|| async { css(PICO_CSS) }))
         .route("/assets/main.css", get(|| async { css(MAIN_CSS) }))
         .with_state(AppState { catalog })

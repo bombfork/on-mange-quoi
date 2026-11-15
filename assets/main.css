@@ -32,3 +32,11 @@ article.recipe button {
   border-inline-start: 0.25rem solid var(--pico-primary);
   background: var(--pico-card-background-color);
 }
+
+@media print {
+  header p,
+  .actions,
+  form {
+    display: none;
+  }
+}

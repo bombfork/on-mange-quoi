@@ -5,7 +5,6 @@
   },
   "landing": {
     "intro": "Choisir le nombre de repas et les critères\u00a0: l’application propose des menus, vérifie ce qui est déjà en stock, puis prépare la liste de courses.",
-    "status": "Application en cours de construction.",
     "catalog_summary": "Recettes au catalogue\u00a0: {count}"
   },
   "cli": {
@@ -64,5 +63,20 @@
   "accepted": {
     "heading": "Menu validé",
     "edit": "Modifier le menu"
+  },
+  "stock": {
+    "heading": "Vérifier le stock",
+    "help": "Cocher les ingrédients déjà en stock. Les produits de base ne sont pas demandés.",
+    "nothing_to_check": "Aucun ingrédient à vérifier\u00a0: les recettes n’utilisent que des produits de base.",
+    "with_menu": "Ajouter le menu à la liste de courses",
+    "submit": "Préparer la liste de courses"
+  },
+  "shopping": {
+    "heading": "Liste de courses",
+    "empty": "Rien à acheter\u00a0: tout est déjà en stock.",
+    "menu": "Menu",
+    "text_version": "Version texte (à copier ou imprimer)",
+    "edit_stock": "Modifier le stock",
+    "new_menu": "Préparer un autre menu"
   }
 }
