@@ -189,10 +189,14 @@ fn duplicate_recipe_name_is_refused() {
     let error = editor(&dir)
         .create_recipe(&input("ratatouille", &["courgettes"], &[]))
         .unwrap_err();
-    assert!(matches!(
-        kinds(error).as_slice(),
-        [ProblemKind::DuplicateRecipeName { .. }]
-    ));
+    assert!(
+        matches!(
+            kinds(error).as_slice(),
+            [ProblemKind::DuplicateRecipeName { other, .. }]
+                if *other == dir.path().join(recipe_path("ratatouille"))
+        ),
+        "points at the real file, not the staging copy"
+    );
 }
 
 #[test]

@@ -379,8 +379,17 @@ impl Editor {
             let problems = problems
                 .into_iter()
                 .map(|mut problem| {
-                    if let Ok(relative) = problem.path.strip_prefix(staged) {
-                        problem.path = self.dir.join(relative);
+                    // Problems name staged files: point them at the real ones.
+                    let real = |path: &mut PathBuf| {
+                        if let Ok(relative) = path.strip_prefix(staged) {
+                            *path = self.dir.join(relative);
+                        }
+                    };
+                    real(&mut problem.path);
+                    if let catalog::ProblemKind::DuplicateRecipeName { other, .. } =
+                        &mut problem.kind
+                    {
+                        real(other);
                     }
                     problem
                 })
