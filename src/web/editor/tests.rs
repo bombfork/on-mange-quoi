@@ -10,7 +10,7 @@ use tempfile::TempDir;
 use crate::catalog::{self, RECIPES_DIR};
 use crate::i18n::MESSAGES;
 use crate::live::LiveCatalog;
-use crate::web::test_support::{body_text, get_live, post_form, send};
+use crate::web::test_support::{body_text, get_live, get_read_only, post_form, send};
 
 /// A copy of the example catalog, served live.
 fn served_copy() -> (TempDir, Arc<LiveCatalog>) {
@@ -529,4 +529,49 @@ async fn ingredient_tags_are_edited_on_the_ingredient_page() {
 
     let body = page(&live, "/catalog/ingredients").await;
     assert!(body.contains("<mark>viande blanche, volaille</mark>"));
+}
+
+#[tokio::test]
+async fn read_only_mode_shows_the_served_catalog_without_forms() {
+    // Served from memory: the directory on disk is empty.
+    let dir = TempDir::new().unwrap();
+    let example = FilePath::new(env!("CARGO_MANIFEST_DIR")).join("examples/catalog");
+    let live = Arc::new(LiveCatalog::new(
+        dir.path().to_path_buf(),
+        catalog::load(&example).unwrap(),
+    ));
+    let browse = |uri: &'static str| {
+        let live = Arc::clone(&live);
+        async move {
+            let response = get_read_only(live, uri).await;
+            assert_eq!(response.status(), StatusCode::OK, "{uri}");
+            body_text(response).await
+        }
+    };
+
+    let body = browse("/catalog/recipes").await;
+    assert!(body.contains("Croque-monsieur"));
+    assert!(!body.contains(&MESSAGES.editor.new_recipe));
+    assert!(!body.contains(r#"href="/catalog/import""#));
+    assert!(!body.contains(&MESSAGES.editor.read_only));
+
+    let body = browse("/catalog/recipes/croque-monsieur").await;
+    assert!(body.contains("<h2>Croque-monsieur</h2>"));
+    assert!(body.contains("<li>pain de mie</li>"));
+    assert!(body.contains("Tags\u{a0}: viande, enfants, rapide"));
+    assert!(body.contains(&MESSAGES.editor.back));
+    assert!(!body.contains("<form"));
+
+    let body = browse("/catalog/ingredients/edit?name=jambon").await;
+    assert!(body.contains("<h2>jambon</h2>"));
+    assert!(body.contains("Tags d’ingrédient\u{a0}: charcuterie"));
+    assert!(body.contains("Croque-monsieur"), "used by");
+    assert!(!body.contains("<form"));
+
+    let body = browse("/catalog/ingredients/edit?name=sel").await;
+    assert!(body.contains(&format!("({})", MESSAGES.editor.staple_marker)));
+
+    for uri in ["/catalog/ingredients", "/catalog/tags"] {
+        assert!(!browse(uri).await.contains("<form"), "{uri}");
+    }
 }

@@ -53,6 +53,8 @@ struct Change {
 
 pub struct Editor {
     dir: PathBuf,
+    /// Refuses every edit, without even probing the directory.
+    read_only: bool,
     /// Serializes edits made by this server, so that version checks and writes do not
     /// interleave.
     lock: Mutex<()>,
@@ -66,12 +68,24 @@ impl Editor {
     pub fn new(dir: PathBuf) -> Self {
         Self {
             dir,
+            read_only: false,
             lock: Mutex::new(()),
+        }
+    }
+
+    /// An editor that never writes to `dir`.
+    pub fn read_only(dir: PathBuf) -> Self {
+        Self {
+            read_only: true,
+            ..Self::new(dir)
         }
     }
 
     /// Whether files can be created in the catalog directory and in its recipes directory.
     pub fn is_writable(&self) -> bool {
+        if self.read_only {
+            return false;
+        }
         [self.dir.clone(), self.dir.join(RECIPES_DIR)]
             .iter()
             .all(|dir| {

@@ -21,8 +21,8 @@ network.
 
 Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
 serves the whole main flow (criteria, proposal, rejection, stock check, shopping list), the
-"Que cuisiner ?" page (recipes from the stock) and the catalog editor. The catalog is reloaded
-when its files change.
+"Que cuisiner ?" page (recipes from the stock) and the catalog editor, or everything but the
+editor in read-only mode. The catalog is reloaded when its files change.
 
 ## Technical decisions
 
@@ -30,6 +30,11 @@ when its files change.
   outweighs everything else, including a public demo: there is no GitHub Pages showcase.
 - Distributed as a single binary only: no container image and no mobile app for now.
 - No authentication for now: the app trusts the local network.
+- Read-only mode (`--read-only`) for a public instance, on its own domain: no route writes
+  (edit routes are not registered, and the `Editor` refuses edits without even probing the
+  directory), the catalog pages show the served catalog without forms, and the problems of the
+  catalog files are logged but not shown. It typically runs next to a read-write instance on
+  the same catalog directory and picks up its edits through hot reload.
 - Pages are rendered on the server from templates, with plain HTML forms and no JavaScript.
   Pico CSS is embedded in the binary.
 - The state of the main flow (proposed, accepted and rejected recipes, ticked ingredients)
@@ -79,6 +84,7 @@ when its files change.
 - JSON Schemas for the YAML files are generated from the Rust types, for editor autocompletion.
 - Command line:
   - `on-mange-quoi --catalog <dir> --port <port>` serves the catalog.
+  - `on-mange-quoi --catalog <dir> --port <port> --read-only` serves it without the editor.
   - `on-mange-quoi --catalog <dir> --validate` validates the catalog without serving it.
   - `on-mange-quoi --catalog <dir> --validate <file> [--validate <file>...]` validates
     ingredients or recipe files without serving, with the same code the server uses. The files
@@ -136,7 +142,7 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
 - `src/live.rs` - `LiveCatalog`: the served `Snapshot` (catalog plus the problems of the files
   on disk), swapped as a whole under a lock; `spawn_watcher` polls `catalog::fingerprint` in a
   thread and reloads after each settled change.
-- `src/editor.rs` - `Editor`: catalog edits (recipes, ingredients, tags) validated on a staging
+- `src/editor.rs` - `Editor` (`Editor::read_only` never writes): catalog edits (recipes, ingredients, tags) validated on a staging
   copy then written atomically, version tokens, YAML writing (plain scalars when unambiguous,
   JSON-quoted otherwise), recipe identifiers derived from names (`slug`).
 - `src/editor/import.rs` - `Editor::import`: parses the documents (top-level keys first, for
@@ -153,7 +159,8 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
   near (`MAX_MISSING`), staples counting as in stock.
 - `src/shopping.rs` - domain module for steps 4 and 5: ingredients to check (union of the menu's
   ingredients, without staples, in catalog order) and the shopping list.
-- `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. Each request takes a
+- `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. `Mode` (read-write or
+  read-only) decides which routes exist: read-only registers the GET pages only. Each request takes a
   snapshot of the `LiveCatalog` from the router state; every page struct has `catalog_errors`,
   shown as a banner by `base.html`.
 - `src/web/flow.rs` - the flow state as carried by query strings, shared by every page:
@@ -168,7 +175,8 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
   `/shopping-list` and `/shopping-list.txt` (plain text, to copy or print).
 - `src/web/editor.rs` - editor pages under `/catalog/` (recipes, ingredients, tags, import), shown from
   the catalog on disk; a successful edit reloads the served catalog and redirects with a
-  `notice`. Templates in `templates/editor/`.
+  `notice`. `Access`: edit, unwritable directory (the pages say so) or browse (read-only mode,
+  showing the served catalog). Templates in `templates/editor/`.
 - `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct
   (`deny_unknown_fields`), so templates reference keys as fields checked at compile time.
   `interpolate()` fills `{name}` placeholders. Tests enforce French typography in the locale.

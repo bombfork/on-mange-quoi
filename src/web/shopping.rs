@@ -9,7 +9,7 @@ use axum::response::{IntoResponse, Response};
 use super::flow::{
     Field, RecipeView, encode, hidden, menu_fields, parse, recipe_views, stock_fields,
 };
-use super::{AppState, Pairs, catalog_errors, render};
+use super::{AppState, Pairs, render};
 use crate::catalog::Catalog;
 use crate::i18n::{MESSAGES, Messages};
 use crate::shopping;
@@ -46,7 +46,7 @@ pub(super) async fn stock_check(State(state): State<AppState>, Query(pairs): Pai
     let menu_query = encode(&menu_fields(&query.menu));
     render(&StockPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&snapshot),
+        catalog_errors: state.catalog_errors(&snapshot),
         recipes: recipe_views(catalog, &query.menu.proposed),
         menu_query,
         fields: hidden(menu_fields(&query.menu)),
@@ -96,7 +96,7 @@ pub(super) async fn shopping_list(State(state): State<AppState>, Query(pairs): P
     let snapshot = state.live.snapshot();
     render(&ShoppingPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&snapshot),
+        catalog_errors: state.catalog_errors(&snapshot),
         list: shopping_list_from(&snapshot.catalog, &pairs),
     })
 }

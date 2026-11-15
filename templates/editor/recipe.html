@@ -3,7 +3,7 @@
 {% block content %}
 {% include "editor/nav.html" %}
 <h2>{{ heading }}</h2>
-{% if writable %}
+{% if access.can_edit() %}
 <form method="post" action="{{ action }}">
   <input type="hidden" name="version" value="{{ version }}" />
   <label>
@@ -57,5 +57,15 @@
 {% if let Some(url) = delete_url %}
 <p><a href="{{ url }}" class="secondary">{{ t.editor.delete }}</a></p>
 {% endif %}
+{% else %}
+<ul>
+  {% for item in selected %}
+  <li>{{ item.name }}</li>
+  {% endfor %}
+</ul>
+{% if !tags_line.is_empty() %}
+<p>{{ tags_line }}</p>
+{% endif %}
+<p><a href="/catalog/recipes">{{ t.editor.back }}</a></p>
 {% endif %}
 {% endblock %}

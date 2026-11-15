@@ -3,7 +3,7 @@
 {% block content %}
 {% include "editor/nav.html" %}
 <h2>{{ heading }}</h2>
-{% if writable %}
+{% if access.can_edit() %}
 <form method="post" action="{{ add_action }}">
   <input type="hidden" name="version" value="{{ version }}" />
   <fieldset role="group">

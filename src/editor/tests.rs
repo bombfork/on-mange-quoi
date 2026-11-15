@@ -509,6 +509,26 @@ fn a_read_only_catalog_cannot_be_edited() {
     assert!(matches!(result, Err(EditError::ReadOnly)));
 }
 
+#[test]
+fn a_read_only_editor_never_writes() {
+    let dir = example_copy();
+    let entries = |path: &Path| -> Vec<_> {
+        let mut names: Vec<_> = fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        names.sort();
+        names
+    };
+    let before = (entries(dir.path()), entries(&dir.path().join(RECIPES_DIR)));
+    let editor = Editor::read_only(dir.path().to_path_buf());
+    assert!(!editor.is_writable());
+    let result = editor.create_recipe(&input("Pain", &["beurre"], &[]));
+    assert!(matches!(result, Err(EditError::ReadOnly)));
+    let after = (entries(dir.path()), entries(&dir.path().join(RECIPES_DIR)));
+    assert_eq!(before, after);
+}
+
 mod import {
     use super::*;
     use crate::editor::{ImportError, ImportProblem, ImportProblemKind, ImportReport};

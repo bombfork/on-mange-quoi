@@ -12,7 +12,7 @@ use axum::extract::{Query, State};
 use axum::response::Response;
 
 use super::flow::{Field, cook_fields, encode, hidden, parse, stock_fields};
-use super::{AppState, Pairs, catalog_errors, render};
+use super::{AppState, Pairs, render};
 use crate::catalog::normalize::closest;
 use crate::catalog::{Catalog, IngredientTag};
 use crate::cook::{Suggestion, quick_additions, refinements, suggest};
@@ -185,7 +185,7 @@ pub(super) async fn page(State(state): State<AppState>, Query(pairs): Pairs) -> 
 
     render(&CookPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&snapshot),
+        catalog_errors: state.catalog_errors(&snapshot),
         groups,
         refine_buttons,
         other_open: other_tags.iter().any(|tag| tag.required || tag.excluded),

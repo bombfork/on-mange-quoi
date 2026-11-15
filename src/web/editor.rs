@@ -1,9 +1,11 @@
 //! Pages of the catalog editor: recipes, ingredients and tags.
 //!
 //! Pages show the catalog as it is on disk. Changes are POST forms; a successful change reloads
-//! the served catalog and redirects (303) to the list page with a notice.
+//! the served catalog and redirects (303) to the list page with a notice. In read-only mode,
+//! the pages only show the served catalog.
 
 use std::path::Path as FilePath;
+use std::sync::Arc;
 
 use askama::Template;
 use axum::extract::{Form, Path, Query, State};
@@ -11,7 +13,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
 
 use super::flow::{Field, encode};
-use super::{AppState, Pairs, catalog_errors, render};
+use super::{AppState, Mode, Pairs, render};
 use crate::catalog::normalize::{closest, normalize};
 use crate::catalog::{Catalog, INGREDIENTS_FILE, TAGS_FILE};
 use crate::editor::{
@@ -21,6 +23,43 @@ use crate::i18n::{MESSAGES, Messages, interpolate};
 use crate::report;
 
 type FormPairs = Form<Vec<(String, String)>>;
+
+/// What the catalog pages allow.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Access {
+    Edit,
+    /// The catalog directory cannot be written: the pages say so.
+    Unwritable,
+    /// Read-only mode.
+    Browse,
+}
+
+impl Access {
+    fn of(state: &AppState) -> Self {
+        match state.mode {
+            Mode::ReadOnly => Access::Browse,
+            Mode::ReadWrite if state.editor.is_writable() => Access::Edit,
+            Mode::ReadWrite => Access::Unwritable,
+        }
+    }
+
+    fn can_edit(&self) -> bool {
+        *self == Access::Edit
+    }
+
+    fn is_unwritable(&self) -> bool {
+        *self == Access::Unwritable
+    }
+}
+
+/// The catalog the pages show: the files on disk, which edits start from, or the served
+/// catalog in read-only mode.
+fn shown_catalog(state: &AppState) -> Result<Arc<Catalog>, EditError> {
+    match state.mode {
+        Mode::ReadWrite => state.editor.catalog().map(Arc::new),
+        Mode::ReadOnly => Ok(state.live.snapshot().catalog),
+    }
+}
 
 fn first(pairs: &[(String, String)], key: &str) -> String {
     pairs
@@ -75,7 +114,7 @@ struct MessagePage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
 }
 
 /// A page with only the editor navigation and the error.
@@ -86,10 +125,10 @@ fn message_page(state: &AppState, error: &EditError) -> Response {
     };
     let page = render(&MessagePage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices: Vec::new(),
         errors: error_messages(error),
-        writable: state.editor.is_writable(),
+        access: Access::of(state),
     });
     (status, page).into_response()
 }
@@ -101,7 +140,7 @@ struct ConfirmPage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
     heading: String,
     help: String,
     items: Vec<String>,
@@ -126,21 +165,21 @@ struct RecipesPage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
     recipes: Vec<RecipeRow>,
 }
 
 pub(super) async fn recipes(State(state): State<AppState>, Query(pairs): Pairs) -> Response {
-    let catalog = match state.editor.catalog() {
+    let catalog = match shown_catalog(&state) {
         Ok(catalog) => catalog,
         Err(error) => return message_page(&state, &error),
     };
     render(&RecipesPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices: notices(&pairs),
         errors: Vec::new(),
-        writable: state.editor.is_writable(),
+        access: Access::of(&state),
         recipes: catalog
             .recipes
             .iter()
@@ -176,7 +215,7 @@ struct RecipePage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
     heading: String,
     action: String,
     version: String,
@@ -186,6 +225,8 @@ struct RecipePage {
     focus_search: bool,
     all_ingredients: Vec<String>,
     tags: Vec<Choice>,
+    /// The recipe's tags, when it cannot be edited.
+    tags_line: String,
     delete_url: Option<String>,
 }
 
@@ -242,6 +283,7 @@ fn recipe_page(
             }
         })
         .collect();
+    let access = Access::of(state);
     let (heading, action, delete_url) = match target {
         RecipeTarget::New => (
             MESSAGES.editor.new_recipe.clone(),
@@ -249,17 +291,29 @@ fn recipe_page(
             None,
         ),
         RecipeTarget::Existing { id, name } => (
-            interpolate(&MESSAGES.editor.edit_recipe, &[("name", name)]),
+            if access.can_edit() {
+                interpolate(&MESSAGES.editor.edit_recipe, &[("name", name)])
+            } else {
+                name.clone()
+            },
             format!("/catalog/recipes/{id}"),
             Some(format!("/catalog/recipes/{id}/delete")),
         ),
     };
+    let tags_line = if form.input.tags.is_empty() {
+        String::new()
+    } else {
+        interpolate(
+            &MESSAGES.editor.tags_line,
+            &[("tags", &form.input.tags.join(", "))],
+        )
+    };
     render(&RecipePage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices: form.notices,
         errors: form.errors,
-        writable: state.editor.is_writable(),
+        access,
         heading,
         action,
         version: form.version,
@@ -276,6 +330,7 @@ fn recipe_page(
                 checked: form.input.tags.contains(name),
             })
             .collect(),
+        tags_line,
         delete_url,
     })
 }
@@ -407,7 +462,7 @@ fn existing(catalog: &Catalog, id: &str) -> Result<RecipeTarget, EditError> {
 }
 
 pub(super) async fn edit_recipe(State(state): State<AppState>, Path(id): Path<String>) -> Response {
-    let found = state.editor.catalog().and_then(|catalog| {
+    let found = shown_catalog(&state).and_then(|catalog| {
         let target = existing(&catalog, &id)?;
         Ok((catalog, target))
     });
@@ -490,10 +545,10 @@ pub(super) async fn confirm_delete_recipe(
     };
     render(&ConfirmPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices: Vec::new(),
         errors: Vec::new(),
-        writable: state.editor.is_writable(),
+        access: Access::of(&state),
         heading: interpolate(&MESSAGES.editor.delete_recipe, &[("name", &name)]),
         help: MESSAGES.editor.delete_recipe_help.clone(),
         items: Vec::new(),
@@ -585,7 +640,7 @@ struct NamesPage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
     heading: String,
     add_action: String,
     version: String,
@@ -603,7 +658,7 @@ fn names_page(
     new_name: String,
     new_staple: bool,
 ) -> Response {
-    let catalog = match state.editor.catalog() {
+    let catalog = match shown_catalog(state) {
         Ok(catalog) => catalog,
         Err(error) => return message_page(state, &error),
     };
@@ -627,10 +682,10 @@ fn names_page(
         .collect();
     render(&NamesPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices,
         errors,
-        writable: state.editor.is_writable(),
+        access: Access::of(state),
         heading: match kind {
             Kind::Ingredient => MESSAGES.editor.ingredients.clone(),
             Kind::Tag => MESSAGES.editor.tags.clone(),
@@ -708,7 +763,7 @@ struct NamePage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
     heading: String,
     save_action: String,
     delete_action: String,
@@ -719,6 +774,8 @@ struct NamePage {
     staple: bool,
     /// Ingredient tags, for an ingredient.
     ingredient_tags: Vec<Choice>,
+    /// The ingredient tags of an ingredient, when it cannot be edited.
+    tags_line: String,
     used_by: String,
     list_url: String,
 }
@@ -752,7 +809,7 @@ fn name_page(
     form: Option<NameForm>,
     errors: Vec<String>,
 ) -> Response {
-    let catalog = match state.editor.catalog() {
+    let catalog = match shown_catalog(state) {
         Ok(catalog) => catalog,
         Err(error) => return message_page(state, &error),
     };
@@ -779,17 +836,20 @@ fn name_page(
     };
     let users = kind.users(&catalog, name);
     let m = &MESSAGES.editor;
+    let access = Access::of(state);
     let heading = match kind {
-        Kind::Ingredient => &m.edit_ingredient,
-        Kind::Tag => &m.edit_tag,
+        _ if !access.can_edit() => name.to_string(),
+        Kind::Ingredient => interpolate(&m.edit_ingredient, &[("name", &name)]),
+        Kind::Tag => interpolate(&m.edit_tag, &[("name", &name)]),
     };
+    let current_tags = tags_of(&catalog, kind, name);
     render(&NamePage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices: Vec::new(),
         errors,
-        writable: state.editor.is_writable(),
-        heading: interpolate(heading, &[("name", &name)]),
+        access,
+        heading,
         save_action: format!("{}/edit", kind.base()),
         delete_action: format!("{}/delete", kind.base()),
         version: form.version,
@@ -798,6 +858,14 @@ fn name_page(
         with_staple: kind == Kind::Ingredient,
         staple: form.staple,
         ingredient_tags,
+        tags_line: if current_tags.is_empty() {
+            String::new()
+        } else {
+            interpolate(
+                &m.ingredient_tags_line,
+                &[("tags", &current_tags.join(", "))],
+            )
+        },
         used_by: if users.is_empty() {
             String::new()
         } else {
@@ -863,10 +931,10 @@ fn update_name(state: &AppState, kind: Kind, pairs: &[(String, String)]) -> Resp
             });
             return render(&ConfirmPage {
                 t: &MESSAGES,
-                catalog_errors: catalog_errors(&state.live.snapshot()),
+                catalog_errors: state.catalog_errors(&state.live.snapshot()),
                 notices: Vec::new(),
                 errors: Vec::new(),
-                writable: state.editor.is_writable(),
+                access: Access::of(state),
                 heading: interpolate(&MESSAGES.editor.rename, &[("old", &old), ("new", &new)]),
                 help: MESSAGES.editor.rename_help.clone(),
                 items: users,
@@ -952,7 +1020,7 @@ struct ImportPage {
     catalog_errors: Vec<String>,
     notices: Vec<String>,
     errors: Vec<String>,
-    writable: bool,
+    access: Access,
     text: String,
 }
 
@@ -964,10 +1032,10 @@ fn import_page(
 ) -> Response {
     render(&ImportPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&state.live.snapshot()),
+        catalog_errors: state.catalog_errors(&state.live.snapshot()),
         notices,
         errors,
-        writable: state.editor.is_writable(),
+        access: Access::of(state),
         text,
     })
 }

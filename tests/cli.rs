@@ -50,6 +50,7 @@ fn help_lists_options() {
         .stdout(contains("--catalog"))
         .stdout(contains("--port"))
         .stdout(contains("--host"))
+        .stdout(contains("--read-only"))
         .stdout(contains("--validate"));
 }
 
@@ -174,6 +175,15 @@ fn validate_cannot_be_combined_with_server_options() {
         .assert()
         .failure()
         .stderr(contains("--port"));
+}
+
+#[test]
+fn validate_cannot_be_combined_with_read_only() {
+    on_mange_quoi()
+        .args(["--catalog", EXAMPLE_CATALOG, "--read-only", "--validate"])
+        .assert()
+        .failure()
+        .stderr(contains("--read-only"));
 }
 
 #[test]

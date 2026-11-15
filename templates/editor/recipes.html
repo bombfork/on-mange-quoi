@@ -3,7 +3,7 @@
 {% block content %}
 {% include "editor/nav.html" %}
 <h2>{{ t.editor.recipes }}</h2>
-{% if writable %}
+{% if access.can_edit() %}
 <p><a href="/catalog/recipes/new" role="button">{{ t.editor.new_recipe }}</a></p>
 {% endif %}
 {% if recipes.is_empty() %}

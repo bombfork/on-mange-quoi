@@ -60,6 +60,17 @@ run it on a trusted local network only. Edit requests coming from other sites ar
 Behind a reverse proxy, browsers that do not send `Sec-Fetch-Site` need the proxy to forward
 the original `Host` header for edits to work.
 
+To make the app reachable beyond the local network, serve it in read-only mode:
+
+```bash
+on-mange-quoi --catalog path/to/catalog --port 8081 --read-only
+```
+
+Everything works except editing: the catalog pages only show recipes, ingredients and tags, and
+no request can change the files. Run it next to a read-write instance on the same catalog
+directory, kept on the local network: the read-only one picks up its edits within a couple of
+seconds. Errors in the catalog files are not shown to visitors, only logged.
+
 The catalog layout:
 
 ```

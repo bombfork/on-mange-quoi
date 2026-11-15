@@ -3,7 +3,9 @@
     <li><a href="/catalog/recipes">{{ t.editor.recipes }}</a></li>
     <li><a href="/catalog/ingredients">{{ t.editor.ingredients }}</a></li>
     <li><a href="/catalog/tags">{{ t.editor.tags }}</a></li>
+    {% if access.can_edit() %}
     <li><a href="/catalog/import">{{ t.editor.import }}</a></li>
+    {% endif %}
   </ul>
 </nav>
 {% for notice in notices %}
@@ -18,6 +20,6 @@
   </ul>
 </article>
 {% endif %}
-{% if !writable %}
+{% if access.is_unwritable() %}
 <p class="notice">{{ t.editor.read_only }}</p>
 {% endif %}

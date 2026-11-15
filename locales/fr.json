@@ -20,9 +20,11 @@
     "catalog": "Dossier du catalogue (ingredients.yml, tags.yml, recipes/)",
     "host": "Adresse d’écoute",
     "port": "Port d’écoute",
+    "read_only": "Servir le catalogue sans permettre de le modifier, par exemple pour l’exposer hors du réseau local",
     "catalog_not_a_directory": "Le catalogue doit être un dossier\u00a0: {path}",
     "bind_failed": "Impossible d’écouter sur {address}",
     "listening": "Catalogue {catalog} servi sur http://{address}",
+    "listening_read_only": "Catalogue {catalog} servi en lecture seule sur http://{address}",
     "validate": "Valider le catalogue sans le servir, ou un fichier d’ingrédients, de tags ou de recette par rapport au catalogue (option répétable)",
     "catalog_loaded": "Catalogue chargé (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
     "catalog_valid": "Catalogue valide (recettes\u00a0: {recipes}, ingrédients\u00a0: {ingredients}, tags\u00a0: {tags})",
@@ -134,6 +136,7 @@
     "add": "Ajouter",
     "delete": "Supprimer",
     "cancel": "Annuler",
+    "back": "Retour à la liste",
     "confirm": "Confirmer",
     "delete_recipe": "Supprimer la recette «\u00a0{name}\u00a0»\u202f?",
     "delete_recipe_help": "La recette sera supprimée du catalogue.",
@@ -169,6 +172,8 @@
     "import_unknown_key": "clé inconnue «\u00a0{key}\u00a0», clés attendues\u00a0: «\u00a0ingredients\u00a0», «\u00a0staples\u00a0» ou «\u00a0recipe\u00a0»",
     "import_mixed": "un document contient soit des ingrédients, soit une recette, pas les deux",
     "ingredient_tags": "Tags d’ingrédient",
+    "ingredient_tags_line": "Tags d’ingrédient\u00a0: {tags}",
+    "tags_line": "Tags\u00a0: {tags}",
     "new_ingredient_tag": "Nouveau tag d’ingrédient",
     "new_ingredient_tag_example": "par exemple viande rouge"
   }

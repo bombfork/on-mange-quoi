@@ -10,7 +10,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use super::flow::{
     Field, RecipeView, criteria_fields, encode, hidden, menu_fields, parse, recipe_views,
 };
-use super::{AppState, Pairs, catalog_errors, render};
+use super::{AppState, Pairs, render};
 use crate::i18n::{MESSAGES, Messages, interpolate};
 use crate::menu::{MAX_MEALS, TagFilter};
 
@@ -50,7 +50,7 @@ pub(super) async fn plan(State(state): State<AppState>, Query(pairs): Pairs) -> 
         .collect();
     render(&PlanPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&snapshot),
+        catalog_errors: state.catalog_errors(&snapshot),
         catalog_summary: interpolate(
             &MESSAGES.landing.catalog_summary,
             &[("count", &catalog.recipes.len())],
@@ -105,7 +105,7 @@ pub(super) async fn proposal(State(state): State<AppState>, Query(pairs): Pairs)
 
     render(&MenuPage {
         t: &MESSAGES,
-        catalog_errors: catalog_errors(&snapshot),
+        catalog_errors: state.catalog_errors(&snapshot),
         recipes: recipe_views(catalog, &menu.proposed),
         fields: hidden(menu_fields(&menu)),
         notices,

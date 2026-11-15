@@ -2,11 +2,14 @@
 
 {% block content %}
 {% include "editor/nav.html" %}
-<h2>{{ heading }}</h2>
+<h2>{{ heading }}{% if !access.can_edit() && staple %} <small>({{ t.editor.staple_marker }})</small>{% endif %}</h2>
+{% if !access.can_edit() && !tags_line.is_empty() %}
+<p>{{ tags_line }}</p>
+{% endif %}
 {% if !used_by.is_empty() %}
 <p><small>{{ used_by }}</small></p>
 {% endif %}
-{% if writable %}
+{% if access.can_edit() %}
 <form method="post" action="{{ save_action }}">
   <input type="hidden" name="version" value="{{ version }}" />
   <input type="hidden" name="name" value="{{ old_name }}" />
@@ -35,5 +38,5 @@
   <button type="submit" class="secondary outline">{{ t.editor.delete }}</button>
 </form>
 {% endif %}
-<p><a href="{{ list_url }}">{{ t.editor.cancel }}</a></p>
+<p><a href="{{ list_url }}">{% if access.can_edit() %}{{ t.editor.cancel }}{% else %}{{ t.editor.back }}{% endif %}</a></p>
 {% endblock %}

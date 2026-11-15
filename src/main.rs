@@ -10,7 +10,8 @@ use clap::{ArgAction, Parser};
 use on_mange_quoi::catalog::{self, Catalog, Problem};
 use on_mange_quoi::i18n::{MESSAGES, interpolate};
 use on_mange_quoi::live::{self, LiveCatalog, Snapshot};
-use on_mange_quoi::{report, web};
+use on_mange_quoi::report;
+use on_mange_quoi::web::{self, Mode};
 
 #[derive(Debug, Parser)]
 #[command(version, about = MESSAGES.cli.about.as_str())]
@@ -25,6 +26,9 @@ struct Cli {
     #[arg(long, default_value_t = 8080, help = MESSAGES.cli.port.as_str())]
     port: u16,
 
+    #[arg(long, help = MESSAGES.cli.read_only.as_str())]
+    read_only: bool,
+
     // Without a file, validates the catalog as it is.
     #[arg(
         long,
@@ -32,7 +36,7 @@ struct Cli {
         num_args = 0..=1,
         action = ArgAction::Append,
         help = MESSAGES.cli.validate.as_str(),
-        conflicts_with_all = ["host", "port"],
+        conflicts_with_all = ["host", "port", "read_only"],
     )]
     validate: Option<Vec<PathBuf>>,
 }
@@ -69,10 +73,15 @@ async fn serve(cli: Cli) -> anyhow::Result<()> {
         .await
         .with_context(|| interpolate(&MESSAGES.cli.bind_failed, &[("address", &address)]))?;
 
+    let (mode, listening) = if cli.read_only {
+        (Mode::ReadOnly, &MESSAGES.cli.listening_read_only)
+    } else {
+        (Mode::ReadWrite, &MESSAGES.cli.listening)
+    };
     println!(
         "{}",
         interpolate(
-            &MESSAGES.cli.listening,
+            listening,
             &[("catalog", &cli.catalog.display()), ("address", &address)],
         )
     );
@@ -80,7 +89,7 @@ async fn serve(cli: Cli) -> anyhow::Result<()> {
     let live = Arc::new(LiveCatalog::new(cli.catalog.clone(), catalog));
     live::spawn_watcher(Arc::clone(&live), fingerprint, RELOAD_INTERVAL, log_reload);
 
-    axum::serve(listener, web::router(live))
+    axum::serve(listener, web::router(live, mode))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())

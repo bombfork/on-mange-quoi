@@ -14,7 +14,7 @@ use axum::extract::{Query, Request};
 use axum::http::{HeaderMap, Method, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 
 use crate::editor::Editor;
 use crate::live::{LiveCatalog, Snapshot};
@@ -26,15 +26,41 @@ const MAIN_CSS: &str = include_str!("../../assets/main.css");
 /// Query string as ordered pairs, keeping repeated keys.
 type Pairs = Query<Vec<(String, String)>>;
 
+/// Whether the app may change the catalog.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    ReadWrite,
+    /// No route writes, so the app can be exposed beyond the local network. The catalog pages
+    /// show the served catalog, and the problems of the files on disk are only logged.
+    ReadOnly,
+}
+
 #[derive(Clone)]
 struct AppState {
     live: Arc<LiveCatalog>,
     editor: Arc<Editor>,
+    mode: Mode,
 }
 
-pub fn router(live: Arc<LiveCatalog>) -> Router {
-    let editor = Arc::new(Editor::new(live.dir().to_path_buf()));
-    Router::new()
+impl AppState {
+    /// Problems of the catalog files on disk, shown on every page while the previous catalog is
+    /// still in use. Not in read-only mode: visitors cannot fix them, and they name server
+    /// paths.
+    fn catalog_errors(&self, snapshot: &Snapshot) -> Vec<String> {
+        match self.mode {
+            Mode::ReadWrite => snapshot.problems.iter().map(report::describe).collect(),
+            Mode::ReadOnly => Vec::new(),
+        }
+    }
+}
+
+pub fn router(live: Arc<LiveCatalog>, mode: Mode) -> Router {
+    let dir = live.dir().to_path_buf();
+    let editor = Arc::new(match mode {
+        Mode::ReadWrite => Editor::new(dir),
+        Mode::ReadOnly => Editor::read_only(dir),
+    });
+    let pages = Router::new()
         .route("/", get(menu::plan))
         .route("/menu", get(menu::proposal))
         .route("/cook", get(cook::page))
@@ -42,49 +68,42 @@ pub fn router(live: Arc<LiveCatalog>) -> Router {
         .route("/shopping-list", get(shopping::shopping_list))
         .route("/shopping-list.txt", get(shopping::shopping_list_text))
         .route("/catalog/recipes", get(editor::recipes))
-        .route(
-            "/catalog/recipes/new",
-            get(editor::new_recipe).post(editor::create_recipe),
-        )
-        .route(
-            "/catalog/recipes/{id}",
-            get(editor::edit_recipe).post(editor::update_recipe),
-        )
-        .route(
-            "/catalog/recipes/{id}/delete",
-            get(editor::confirm_delete_recipe).post(editor::delete_recipe),
-        )
+        .route("/catalog/recipes/{id}", get(editor::edit_recipe))
         .route("/catalog/ingredients", get(editor::ingredients))
-        .route(
-            "/catalog/ingredients/new",
-            axum::routing::post(editor::add_ingredient),
-        )
-        .route(
-            "/catalog/ingredients/edit",
-            get(editor::edit_ingredient).post(editor::update_ingredient),
-        )
-        .route(
-            "/catalog/ingredients/delete",
-            axum::routing::post(editor::delete_ingredient),
-        )
-        .route(
-            "/catalog/import",
-            get(editor::import_form).post(editor::import),
-        )
+        .route("/catalog/ingredients/edit", get(editor::edit_ingredient))
         .route("/catalog/tags", get(editor::tags))
-        .route("/catalog/tags/new", axum::routing::post(editor::add_tag))
-        .route(
-            "/catalog/tags/edit",
-            get(editor::edit_tag).post(editor::update_tag),
-        )
-        .route(
-            "/catalog/tags/delete",
-            axum::routing::post(editor::delete_tag),
-        )
+        .route("/catalog/tags/edit", get(editor::edit_tag))
         .route("/assets/pico.min.css", get(|| async { css(PICO_CSS) }))
-        .route("/assets/main.css", get(|| async { css(MAIN_CSS) }))
-        .layer(middleware::from_fn(same_origin_posts))
-        .with_state(AppState { live, editor })
+        .route("/assets/main.css", get(|| async { css(MAIN_CSS) }));
+    let routes = match mode {
+        Mode::ReadOnly => pages,
+        // Same paths as above merge: GET shows, POST edits.
+        Mode::ReadWrite => pages
+            .route(
+                "/catalog/recipes/new",
+                get(editor::new_recipe).post(editor::create_recipe),
+            )
+            .route("/catalog/recipes/{id}", post(editor::update_recipe))
+            .route(
+                "/catalog/recipes/{id}/delete",
+                get(editor::confirm_delete_recipe).post(editor::delete_recipe),
+            )
+            .route("/catalog/ingredients/new", post(editor::add_ingredient))
+            .route("/catalog/ingredients/edit", post(editor::update_ingredient))
+            .route(
+                "/catalog/ingredients/delete",
+                post(editor::delete_ingredient),
+            )
+            .route(
+                "/catalog/import",
+                get(editor::import_form).post(editor::import),
+            )
+            .route("/catalog/tags/new", post(editor::add_tag))
+            .route("/catalog/tags/edit", post(editor::update_tag))
+            .route("/catalog/tags/delete", post(editor::delete_tag))
+            .layer(middleware::from_fn(same_origin_posts)),
+    };
+    routes.with_state(AppState { live, editor, mode })
 }
 
 /// Rejects POST requests sent by other sites: without authentication, any page opened on the
@@ -116,12 +135,6 @@ fn css(body: &'static str) -> impl IntoResponse {
     ([(header::CONTENT_TYPE, "text/css; charset=utf-8")], body)
 }
 
-/// Problems of the catalog files on disk, shown on every page while the previous catalog is
-/// still in use.
-fn catalog_errors(snapshot: &Snapshot) -> Vec<String> {
-    snapshot.problems.iter().map(report::describe).collect()
-}
-
 fn render(page: &impl Template) -> Response {
     match page.render() {
         Ok(html) => Html(html).into_response(),
@@ -142,6 +155,7 @@ mod test_support {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
+    use super::Mode;
     use crate::catalog::Catalog;
     use crate::live::LiveCatalog;
 
@@ -157,7 +171,16 @@ mod test_support {
     }
 
     pub async fn send(live: Arc<LiveCatalog>, request: Request<Body>) -> Response {
-        super::router(live).oneshot(request).await.unwrap()
+        send_in(live, Mode::ReadWrite, request).await
+    }
+
+    pub async fn send_in(live: Arc<LiveCatalog>, mode: Mode, request: Request<Body>) -> Response {
+        super::router(live, mode).oneshot(request).await.unwrap()
+    }
+
+    pub async fn get_read_only(live: Arc<LiveCatalog>, uri: &str) -> Response {
+        let request = Request::get(uri).body(Body::empty()).unwrap();
+        send_in(live, Mode::ReadOnly, request).await
     }
 
     /// A same-origin form submission.
@@ -181,19 +204,27 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::test_support::{body_text, get, get_live};
+    use axum::body::Body;
+    use axum::http::Request;
+
+    use super::test_support::{body_text, get, get_live, get_read_only, send_in};
     use super::*;
     use crate::catalog::{self, Catalog};
     use crate::i18n::MESSAGES;
 
+    /// The example catalog, served from memory; its directory is the given empty one.
+    fn example_in(dir: &TempDir) -> Arc<LiveCatalog> {
+        let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/catalog");
+        Arc::new(LiveCatalog::new(
+            dir.path().to_path_buf(),
+            catalog::load(&example).unwrap(),
+        ))
+    }
+
     #[tokio::test]
     async fn catalog_errors_are_shown_while_the_previous_catalog_is_served() {
         let dir = TempDir::new().unwrap();
-        let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/catalog");
-        let live = Arc::new(LiveCatalog::new(
-            dir.path().to_path_buf(),
-            catalog::load(&example).unwrap(),
-        ));
+        let live = example_in(&dir);
 
         // The temporary directory is empty: reloading it fails.
         live.reload();
@@ -222,6 +253,78 @@ mod tests {
                 "{uri}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn read_only_mode_hides_catalog_errors() {
+        let dir = TempDir::new().unwrap();
+        let live = example_in(&dir);
+        live.reload();
+        let body = body_text(get_read_only(live, "/").await).await;
+        assert!(!body.contains(&MESSAGES.layout.catalog_errors));
+        assert!(body.contains("Recettes au catalogue\u{a0}: 6"));
+    }
+
+    #[tokio::test]
+    async fn read_only_mode_serves_every_page_but_no_edit() {
+        let dir = TempDir::new().unwrap();
+        let live = example_in(&dir);
+        for uri in [
+            "/",
+            "/cook?have=jambon",
+            "/menu/accepted?meals=1&proposed=croque-monsieur",
+            "/shopping-list?meals=1&proposed=croque-monsieur&with_menu=1",
+            "/shopping-list.txt?meals=1&proposed=croque-monsieur",
+            "/catalog/recipes",
+            "/catalog/recipes/croque-monsieur",
+            "/catalog/ingredients",
+            "/catalog/ingredients/edit?name=jambon",
+            "/catalog/tags",
+            "/catalog/tags/edit?name=enfants",
+        ] {
+            let response = get_read_only(Arc::clone(&live), uri).await;
+            assert_eq!(response.status(), StatusCode::OK, "{uri}");
+        }
+        for uri in [
+            "/catalog/recipes/new",
+            "/catalog/recipes/croque-monsieur/delete",
+            "/catalog/import",
+        ] {
+            let response = get_read_only(Arc::clone(&live), uri).await;
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
+        }
+        for uri in [
+            "/catalog/recipes/new",
+            "/catalog/recipes/croque-monsieur",
+            "/catalog/recipes/croque-monsieur/delete",
+            "/catalog/ingredients/new",
+            "/catalog/ingredients/edit",
+            "/catalog/ingredients/delete",
+            "/catalog/tags/new",
+            "/catalog/tags/edit",
+            "/catalog/tags/delete",
+            "/catalog/import",
+        ] {
+            let request = Request::post(uri)
+                .header("content-type", "application/x-www-form-urlencoded")
+                .header("sec-fetch-site", "same-origin")
+                .body(Body::from(
+                    "name=pain&version=x&yaml=ingredients%3A+%5Bpain%5D",
+                ))
+                .unwrap();
+            let status = send_in(Arc::clone(&live), Mode::ReadOnly, request)
+                .await
+                .status();
+            assert!(
+                status == StatusCode::METHOD_NOT_ALLOWED || status == StatusCode::NOT_FOUND,
+                "{uri}: {status}"
+            );
+        }
+        assert_eq!(
+            fs::read_dir(dir.path()).unwrap().count(),
+            0,
+            "nothing written"
+        );
     }
 
     #[tokio::test]
