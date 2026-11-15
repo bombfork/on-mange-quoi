@@ -84,6 +84,13 @@ pub struct EditorMessages {
     pub invalid: String,
     pub io_error: String,
     pub empty: String,
+    pub search_ingredient: String,
+    pub remove: String,
+    pub new_marker: String,
+    pub replace_with: String,
+    pub mapped: String,
+    pub new_help: String,
+    pub no_ingredient: String,
 }
 
 #[derive(Debug, Deserialize)]

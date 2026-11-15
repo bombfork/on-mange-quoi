@@ -119,6 +119,13 @@
     "in_use": "Suppression impossible, utilisé par les recettes suivantes\u00a0: {recipes}",
     "invalid": "Modification refusée\u00a0:",
     "io_error": "Écriture impossible ({error})",
-    "empty": "Aucun élément pour l’instant."
+    "empty": "Aucun élément pour l’instant.",
+    "search_ingredient": "Rechercher ou créer un ingrédient",
+    "remove": "Retirer",
+    "new_marker": "nouveau",
+    "replace_with": "Remplacer par «\u00a0{name}\u00a0»",
+    "mapped": "«\u00a0{typed}\u00a0» ajouté sous la forme «\u00a0{name}\u00a0», déjà au catalogue.",
+    "new_help": "Les ingrédients marqués «\u00a0nouveau\u00a0» seront ajoutés au catalogue à l’enregistrement.",
+    "no_ingredient": "Aucun ingrédient pour l’instant."
   }
 }

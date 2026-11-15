@@ -46,6 +46,12 @@ catalog editor. The catalog is reloaded when its files change.
   staging copy of the catalog with the same rules as `--validate` before anything is written.
   Renaming an ingredient or a tag used by recipes rewrites those recipes, after a confirmation
   page listing them. Renaming a recipe keeps its file name, hence its identifier.
+- Recipe form: ingredients are picked with a search field whose suggestions come from a native
+  `<datalist>` (no JavaScript). Adding, removing or replacing an ingredient submits the form and
+  shows it again, the search field focused. A typed name that only differs by spelling from a
+  catalog name (normalization) is added as that name; any other unknown name is marked new,
+  with a button to replace it by the closest catalog name when there is one, and new
+  ingredients are added to the catalog when the recipe is saved, in the same validated edit.
 - Edits are POST forms. POST requests from other sites are refused (`Sec-Fetch-Site`, or
   `Origin` against `Host` for browsers without it), since there is no authentication.
 - JSON Schemas for the YAML files are generated from the Rust types, for editor autocompletion.
@@ -227,7 +233,5 @@ Rules:
 ### Open questions
 
 - Using the shopping list away from the local network (in the shop) is not solved yet.
-- Picking ingredients in the recipe form (a checkbox grid in catalog order) is to be revisited
-  once the user has tried it.
 - Ingredients can only be reordered (which orders the shopping list) by editing
   `ingredients.yml` by hand.

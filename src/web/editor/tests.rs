@@ -69,7 +69,7 @@ async fn lists_recipes_with_links_to_edit_them() {
 async fn creates_a_recipe_and_serves_it_at_once() {
     let (dir, live) = served_copy();
     let body = page(&live, "/catalog/recipes/new").await;
-    assert!(body.contains(r#"name="ingredient" value="pain de mie""#));
+    assert!(body.contains(r#"<option value="pain de mie">"#));
 
     let response = post_form(
         Arc::clone(&live),
@@ -80,6 +80,7 @@ async fn creates_a_recipe_and_serves_it_at_once() {
             ("ingredient", "pain de mie"),
             ("ingredient", "jambon"),
             ("tag", "rapide"),
+            ("action", "save"),
         ]),
     )
     .await;
@@ -104,14 +105,131 @@ async fn invalid_recipe_shows_the_problems_and_keeps_the_input() {
     let body = body_text(response).await;
     assert!(body.contains(&MESSAGES.editor.invalid));
     assert!(body.contains("nom de recette en double"));
-    assert!(body.contains(r#"name="ingredient" value="courgettes" checked"#));
+    assert!(body.contains(r#"name="ingredient" value="courgettes" />"#));
+}
+
+/// Posts an action of the new recipe form and returns the page shown again.
+async fn form_action(live: &Arc<LiveCatalog>, fields: &[(&str, &str)]) -> String {
+    let response = post_form(Arc::clone(live), "/catalog/recipes/new", &form(fields)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_text(response).await
+}
+
+fn selected(body: &str, name: &str) -> bool {
+    body.contains(&format!(r#"name="ingredient" value="{name}" />"#))
+}
+
+#[tokio::test]
+async fn searching_adds_catalog_ingredients_without_saving() {
+    let (dir, live) = served_copy();
+    let body = form_action(
+        &live,
+        &[
+            ("name", "Tartine"),
+            ("add", "pain de mie"),
+            ("action", "add"),
+        ],
+    )
+    .await;
+    assert!(selected(&body, "pain de mie"));
+    assert!(body.contains(r#"value="Tartine""#), "the name is kept");
+    assert!(body.contains(" autofocus"), "ready for the next ingredient");
+    assert!(
+        !page(&live, "/catalog/recipes/new")
+            .await
+            .contains(" autofocus")
+    );
+    assert!(!dir.path().join("recipes/tartine.yml").exists());
+
+    // A spelling variant is added under its catalog name.
+    let body = form_action(
+        &live,
+        &[
+            ("ingredient", "pain de mie"),
+            ("add", "Oeufs"),
+            ("action", "add"),
+        ],
+    )
+    .await;
+    assert!(selected(&body, "pain de mie") && selected(&body, "œufs"));
+    assert!(body.contains("ajouté sous la forme"));
+}
+
+#[tokio::test]
+async fn unknown_ingredients_are_new_and_typos_can_be_replaced() {
+    let (_dir, live) = served_copy();
+    let body = form_action(&live, &[("add", "cannelle"), ("action", "add")]).await;
+    assert!(selected(&body, "cannelle"));
+    assert!(body.contains(&MESSAGES.editor.new_marker));
+    assert!(body.contains(&MESSAGES.editor.new_help));
+
+    let body = form_action(
+        &live,
+        &[
+            ("ingredient", "cannelle"),
+            ("add", "coquilettes"),
+            ("action", "add"),
+        ],
+    )
+    .await;
+    assert!(body.contains(r#"name="replace" value="1""#));
+    assert!(body.contains("Remplacer par «\u{a0}coquillettes\u{a0}»"));
+
+    let body = form_action(
+        &live,
+        &[
+            ("ingredient", "cannelle"),
+            ("ingredient", "coquilettes"),
+            ("replace", "1"),
+        ],
+    )
+    .await;
+    assert!(selected(&body, "coquillettes") && !selected(&body, "coquilettes"));
+
+    let body = form_action(
+        &live,
+        &[
+            ("ingredient", "cannelle"),
+            ("ingredient", "coquillettes"),
+            ("remove", "cannelle"),
+        ],
+    )
+    .await;
+    assert!(!selected(&body, "cannelle") && selected(&body, "coquillettes"));
+}
+
+#[tokio::test]
+async fn saving_a_recipe_creates_its_new_ingredients() {
+    let (dir, live) = served_copy();
+    let response = post_form(
+        Arc::clone(&live),
+        "/catalog/recipes/new",
+        &form(&[
+            ("name", "Pain perdu"),
+            ("ingredient", "pain"),
+            ("ingredient", "œufs"),
+            ("ingredient", "lait"),
+            ("action", "save"),
+        ]),
+    )
+    .await;
+    assert_eq!(location(&response), "/catalog/recipes?notice=created");
+    let ingredients = fs::read_to_string(dir.path().join("ingredients.yml")).unwrap();
+    assert!(ingredients.contains("  - pain\n"));
+    assert!(
+        live.snapshot()
+            .catalog
+            .ingredients
+            .iter()
+            .any(|i| i.name == "pain")
+    );
 }
 
 #[tokio::test]
 async fn edits_a_recipe_and_refuses_stale_versions() {
     let (dir, live) = served_copy();
     let body = page(&live, "/catalog/recipes/ratatouille").await;
-    assert!(body.contains(r#"name="ingredient" value="courgettes" checked"#));
+    assert!(body.contains(r#"name="ingredient" value="courgettes" />"#));
     let shown = version(&body);
 
     let edit = |name: &'static str, version: String| {

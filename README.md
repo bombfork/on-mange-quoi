@@ -55,7 +55,8 @@ modified files are invalid, the previous catalog stays in use and every page sho
 until they are fixed.
 
 The catalog can also be edited from the app (the "Catalogue" link): recipes, ingredients and
-tags. Edits are checked with the same rules as below before being written; files written by the
+tags. In the recipe form, ingredients are found with a search field, and a new ingredient can be
+typed there: it is added to the catalog when the recipe is saved. Edits are checked with the same rules as below before being written; files written by the
 app lose their comments and hand formatting. When the catalog directory is read-only, the editor
 is disabled.
 

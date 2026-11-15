@@ -10,12 +10,40 @@
     {{ t.editor.name }}
     <input type="text" name="name" value="{{ name }}" required />
   </label>
-  <fieldset class="choices">
+
+  <fieldset>
     <legend>{{ t.editor.ingredients }}</legend>
-    {% for item in ingredients %}
-    <label><input type="checkbox" name="ingredient" value="{{ item.name }}"{% if item.checked %} checked{% endif %} /> {{ item.name }}</label>
-    {% endfor %}
+    <fieldset role="group">
+      <input type="search" name="add" list="ingredient-names" autocomplete="off"
+             placeholder="{{ t.editor.search_ingredient }}" aria-label="{{ t.editor.search_ingredient }}"{% if focus_search %} autofocus{% endif %} />
+      <button type="submit" name="action" value="add" formnovalidate>{{ t.editor.add }}</button>
+    </fieldset>
+    <datalist id="ingredient-names">
+      {% for name in all_ingredients %}
+      <option value="{{ name }}"></option>
+      {% endfor %}
+    </datalist>
+    {% if selected.is_empty() %}
+    <p><small>{{ t.editor.no_ingredient }}</small></p>
+    {% else %}
+    <ul class="selected-ingredients">
+      {% for item in selected %}
+      <li>
+        <input type="hidden" name="ingredient" value="{{ item.name }}" />
+        <span>{{ item.name }}{% if item.is_new %} <mark>{{ t.editor.new_marker }}</mark>{% endif %}</span>
+        {% if let Some(label) = item.replace_label %}
+        <button type="submit" name="replace" value="{{ item.index }}" class="outline" formnovalidate>{{ label }}</button>
+        {% endif %}
+        <button type="submit" name="remove" value="{{ item.name }}" class="secondary outline" formnovalidate>{{ t.editor.remove }}</button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if has_new %}
+    <p><small>{{ t.editor.new_help }}</small></p>
+    {% endif %}
+    {% endif %}
   </fieldset>
+
   {% if !tags.is_empty() %}
   <fieldset class="choices">
     <legend>{{ t.editor.tags }}</legend>
@@ -24,7 +52,7 @@
     {% endfor %}
   </fieldset>
   {% endif %}
-  <button type="submit">{{ t.editor.save }}</button>
+  <button type="submit" name="action" value="save">{{ t.editor.save }}</button>
 </form>
 {% if let Some(url) = delete_url %}
 <p><a href="{{ url }}" class="secondary">{{ t.editor.delete }}</a></p>

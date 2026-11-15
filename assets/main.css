@@ -62,3 +62,25 @@ fieldset.choices {
 .editor-errors ul {
   margin-bottom: 0;
 }
+
+ul.selected-ingredients {
+  padding: 0;
+}
+
+ul.selected-ingredients li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+  margin-bottom: 0.5rem;
+}
+
+ul.selected-ingredients span {
+  flex: 1;
+}
+
+ul.selected-ingredients button {
+  width: auto;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+}

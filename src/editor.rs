@@ -91,7 +91,8 @@ impl Editor {
         format!("{:016x}", hasher.finish())
     }
 
-    /// Creates a recipe and returns its identifier, derived from its name.
+    /// Creates a recipe and returns its identifier, derived from its name. Ingredients
+    /// missing from the catalog are added to it.
     pub fn create_recipe(&self, input: &RecipeInput) -> Result<String, EditError> {
         let _guard = self.lock();
         let catalog = self.catalog()?;
@@ -110,18 +111,12 @@ impl Editor {
             })
             .find(|id| !taken(id))
             .expect("an unused identifier exists");
-        let path = recipe_path(&id);
-        self.apply(
-            &[],
-            vec![Change {
-                path,
-                content: Some(recipe_yaml(input)),
-            }],
-        )?;
+        self.apply(&[], recipe_changes(&catalog, &id, input))?;
         Ok(id)
     }
 
-    /// Updates a recipe; its file name, hence its identifier, does not change.
+    /// Updates a recipe; its file name, hence its identifier, does not change. Ingredients
+    /// missing from the catalog are added to it.
     pub fn update_recipe(
         &self,
         id: &str,
@@ -131,13 +126,9 @@ impl Editor {
         let _guard = self.lock();
         let catalog = self.catalog()?;
         find_recipe(&catalog, id)?;
-        let path = recipe_path(id);
         self.apply(
-            &[(&path, version)],
-            vec![Change {
-                path: path.clone(),
-                content: Some(recipe_yaml(input)),
-            }],
+            &[(&recipe_path(id), version)],
+            recipe_changes(&catalog, id, input),
         )
     }
 
@@ -389,6 +380,34 @@ impl Editor {
             EditError::Invalid(problems)
         })
     }
+}
+
+/// The recipe file, plus the ingredients file when the recipe uses ingredients missing from the
+/// catalog: they are appended to the regular ingredients.
+fn recipe_changes(catalog: &Catalog, id: &str, input: &RecipeInput) -> Vec<Change> {
+    let mut changes = vec![Change {
+        path: recipe_path(id),
+        content: Some(recipe_yaml(input)),
+    }];
+    let (mut ingredients, staples) = ingredient_lists(catalog);
+    let known = ingredients.len() + staples.len();
+    for name in &input.ingredients {
+        let name = name.trim();
+        let listed = ingredients
+            .iter()
+            .chain(&staples)
+            .any(|known| known == name);
+        if !name.is_empty() && !listed {
+            ingredients.push(name.to_string());
+        }
+    }
+    if ingredients.len() + staples.len() > known {
+        changes.push(Change {
+            path: PathBuf::from(INGREDIENTS_FILE),
+            content: Some(ingredients_yaml(&ingredients, &staples)),
+        });
+    }
+    changes
 }
 
 fn find_recipe<'a>(catalog: &'a Catalog, id: &str) -> Result<&'a Recipe, EditError> {

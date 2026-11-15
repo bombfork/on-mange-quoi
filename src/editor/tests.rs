@@ -138,6 +138,43 @@ fn creates_a_recipe_named_after_its_title() {
 }
 
 #[test]
+fn a_recipe_can_add_new_ingredients_to_the_catalog() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    editor
+        .create_recipe(&input(
+            "Pain perdu",
+            &["pain", "œufs", "lait", "cannelle"],
+            &[],
+        ))
+        .unwrap();
+    let catalog = editor.catalog().unwrap();
+    let regular: Vec<&str> = catalog
+        .ingredients
+        .iter()
+        .filter(|i| !i.staple)
+        .map(|i| i.name.as_str())
+        .collect();
+    assert_eq!(regular[regular.len() - 2..], ["pain", "cannelle"]);
+    assert!(catalog.recipes.iter().any(|r| r.id == "pain-perdu"));
+
+    // A new name that duplicates an existing one is refused, and nothing is written.
+    let before = read(&dir, INGREDIENTS_FILE);
+    let error = editor
+        .create_recipe(&input("Pâtes au beurre", &["Pates", "beurre"], &[]))
+        .unwrap_err();
+    let kinds = kinds(error);
+    assert!(
+        kinds
+            .iter()
+            .any(|kind| matches!(kind, ProblemKind::DuplicateIngredient { .. })),
+        "{kinds:?}"
+    );
+    assert_eq!(read(&dir, INGREDIENTS_FILE), before);
+    assert!(!dir.path().join(recipe_path("pates-au-beurre")).exists());
+}
+
+#[test]
 fn new_recipe_identifiers_do_not_collide() {
     let dir = example_copy();
     let id = editor(&dir)
@@ -147,17 +184,8 @@ fn new_recipe_identifiers_do_not_collide() {
 }
 
 #[test]
-fn invalid_recipe_is_refused_and_nothing_is_written() {
+fn duplicate_recipe_name_is_refused() {
     let dir = example_copy();
-    let error = editor(&dir)
-        .create_recipe(&input("Pain perdu", &["pain"], &[]))
-        .unwrap_err();
-    assert!(matches!(
-        kinds(error).as_slice(),
-        [ProblemKind::UnknownIngredient { name, .. }] if name == "pain"
-    ));
-    assert!(!dir.path().join(recipe_path("pain-perdu")).exists());
-
     let error = editor(&dir)
         .create_recipe(&input("ratatouille", &["courgettes"], &[]))
         .unwrap_err();

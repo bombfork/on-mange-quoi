@@ -12,6 +12,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 
 use super::flow::{Field, encode};
 use super::{AppState, Pairs, catalog_errors, render};
+use crate::catalog::normalize::{closest, normalize};
 use crate::catalog::{Catalog, INGREDIENTS_FILE, TAGS_FILE};
 use crate::editor::{EditError, RecipeInput, recipe_path, recipes_using};
 use crate::i18n::{MESSAGES, Messages, interpolate};
@@ -155,6 +156,17 @@ struct Choice {
     checked: bool,
 }
 
+/// An ingredient of the recipe being edited.
+struct SelectedIngredient {
+    name: String,
+    index: usize,
+    /// Not in the catalog yet: it is added to it when the recipe is saved.
+    is_new: bool,
+    /// For a new ingredient close to a catalog name (a typo?), the label of the button that
+    /// replaces it with that name.
+    replace_label: Option<String>,
+}
+
 #[derive(Template)]
 #[template(path = "editor/recipe.html")]
 struct RecipePage {
@@ -167,7 +179,10 @@ struct RecipePage {
     action: String,
     version: String,
     name: String,
-    ingredients: Vec<Choice>,
+    selected: Vec<SelectedIngredient>,
+    has_new: bool,
+    focus_search: bool,
+    all_ingredients: Vec<String>,
     tags: Vec<Choice>,
     delete_url: Option<String>,
 }
@@ -178,23 +193,53 @@ enum RecipeTarget {
     Existing { id: String, name: String },
 }
 
+/// The values a recipe form shows, and the feedback on the last action.
+#[derive(Default)]
+struct RecipeForm {
+    version: String,
+    input: RecipeInput,
+    notices: Vec<String>,
+    errors: Vec<String>,
+    /// After adding, removing or replacing an ingredient, to go on typing.
+    focus_search: bool,
+}
+
+fn ingredient_names(catalog: &Catalog) -> Vec<&str> {
+    catalog
+        .ingredients
+        .iter()
+        .map(|i| i.name.as_str())
+        .collect()
+}
+
 fn recipe_page(
     state: &AppState,
     catalog: &Catalog,
     target: &RecipeTarget,
-    version: String,
-    input: &RecipeInput,
-    errors: Vec<String>,
+    form: RecipeForm,
 ) -> Response {
-    let choices = |names: Vec<&String>, selected: &[String]| {
-        names
-            .into_iter()
-            .map(|name| Choice {
+    let known = ingredient_names(catalog);
+    let selected: Vec<SelectedIngredient> = form
+        .input
+        .ingredients
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            let is_new = !known.contains(&name.as_str());
+            let replace_label = is_new
+                .then(|| closest(name, known.iter().copied()))
+                .flatten()
+                .map(|suggestion| {
+                    interpolate(&MESSAGES.editor.replace_with, &[("name", &suggestion)])
+                });
+            SelectedIngredient {
                 name: name.clone(),
-                checked: selected.contains(name),
-            })
-            .collect()
-    };
+                index,
+                is_new,
+                replace_label,
+            }
+        })
+        .collect();
     let (heading, action, delete_url) = match target {
         RecipeTarget::New => (
             MESSAGES.editor.new_recipe.clone(),
@@ -210,18 +255,25 @@ fn recipe_page(
     render(&RecipePage {
         t: &MESSAGES,
         catalog_errors: catalog_errors(&state.live.snapshot()),
-        notices: Vec::new(),
-        errors,
+        notices: form.notices,
+        errors: form.errors,
         writable: state.editor.is_writable(),
         heading,
         action,
-        version,
-        name: input.name.clone(),
-        ingredients: choices(
-            catalog.ingredients.iter().map(|i| &i.name).collect(),
-            &input.ingredients,
-        ),
-        tags: choices(catalog.tags.iter().collect(), &input.tags),
+        version: form.version,
+        name: form.input.name.clone(),
+        has_new: selected.iter().any(|item| item.is_new),
+        focus_search: form.focus_search,
+        selected,
+        all_ingredients: known.iter().map(|name| name.to_string()).collect(),
+        tags: catalog
+            .tags
+            .iter()
+            .map(|name| Choice {
+                name: name.clone(),
+                checked: form.input.tags.contains(name),
+            })
+            .collect(),
         delete_url,
     })
 }
@@ -234,16 +286,74 @@ fn recipe_input(pairs: &[(String, String)]) -> RecipeInput {
     }
 }
 
+/// Applies a form action that only changes the form: add, remove or replace an ingredient.
+/// Returns the notices to show, or `None` when the form is to be saved.
+fn edit_form(
+    catalog: &Catalog,
+    pairs: &[(String, String)],
+    input: &mut RecipeInput,
+) -> Option<Vec<String>> {
+    if let Some((_, removed)) = pairs.iter().find(|(key, _)| key == "remove") {
+        input.ingredients.retain(|name| name != removed);
+        return Some(Vec::new());
+    }
+    if let Ok(index) = first(pairs, "replace").parse::<usize>() {
+        let known = ingredient_names(catalog);
+        let suggestion = input
+            .ingredients
+            .get(index)
+            .filter(|name| !known.contains(&name.as_str()))
+            .and_then(|name| closest(name, known.iter().copied()));
+        if let Some(suggestion) = suggestion {
+            if input.ingredients.iter().any(|name| name == suggestion) {
+                input.ingredients.remove(index);
+            } else {
+                input.ingredients[index] = suggestion.to_string();
+            }
+        }
+        return Some(Vec::new());
+    }
+    if first(pairs, "action") == "add" {
+        return Some(add_typed(catalog, input, &first(pairs, "add")));
+    }
+    None
+}
+
+/// Adds a typed name to the recipe: as the catalog name when it only differs by spelling,
+/// otherwise as a new ingredient.
+fn add_typed(catalog: &Catalog, input: &mut RecipeInput, typed: &str) -> Vec<String> {
+    if typed.is_empty() {
+        return Vec::new();
+    }
+    let key = normalize(typed);
+    let known = ingredient_names(catalog);
+    let name = known
+        .iter()
+        .find(|name| **name == typed)
+        .or_else(|| known.iter().find(|name| normalize(name) == key))
+        .copied()
+        .unwrap_or(typed);
+    if input
+        .ingredients
+        .iter()
+        .any(|selected| normalize(selected) == key)
+    {
+        return Vec::new();
+    }
+    input.ingredients.push(name.to_string());
+    if name == typed {
+        Vec::new()
+    } else {
+        vec![interpolate(
+            &MESSAGES.editor.mapped,
+            &[("typed", &typed), ("name", &name)],
+        )]
+    }
+}
+
 pub(super) async fn new_recipe(State(state): State<AppState>) -> Response {
     match state.editor.catalog() {
-        Ok(catalog) => recipe_page(
-            &state,
-            &catalog,
-            &RecipeTarget::New,
-            String::new(),
-            &RecipeInput::default(),
-            Vec::new(),
-        ),
+        Ok(catalog) => recipe_page(&state, &catalog, &RecipeTarget::New, RecipeForm::default()),
         Err(error) => message_page(&state, &error),
     }
 }
@@ -252,23 +362,33 @@ pub(super) async fn create_recipe(
     State(state): State<AppState>,
     Form(pairs): FormPairs,
 ) -> Response {
-    let input = recipe_input(&pairs);
+    let catalog = match state.editor.catalog() {
+        Ok(catalog) => catalog,
+        Err(error) => return message_page(&state, &error),
+    };
+    let mut input = recipe_input(&pairs);
+    if let Some(notices) = edit_form(&catalog, &pairs, &mut input) {
+        let form = RecipeForm {
+            input,
+            notices,
+            focus_search: true,
+            ..RecipeForm::default()
+        };
+        return recipe_page(&state, &catalog, &RecipeTarget::New, form);
+    }
     match state.editor.create_recipe(&input) {
         Ok(_) => {
             state.live.reload();
             done("/catalog/recipes", "created")
         }
-        Err(error) => match state.editor.catalog() {
-            Ok(catalog) => recipe_page(
-                &state,
-                &catalog,
-                &RecipeTarget::New,
-                String::new(),
-                &input,
-                error_messages(&error),
-            ),
-            Err(_) => message_page(&state, &error),
-        },
+        Err(error) => {
+            let form = RecipeForm {
+                input,
+                errors: error_messages(&error),
+                ..RecipeForm::default()
+            };
+            recipe_page(&state, &catalog, &RecipeTarget::New, form)
+        }
     }
 }
 
@@ -298,13 +418,16 @@ pub(super) async fn edit_recipe(State(state): State<AppState>, Path(id): Path<St
         .iter()
         .find(|r| r.id == id)
         .expect("found above");
-    let input = RecipeInput {
-        name: recipe.name.clone(),
-        ingredients: recipe.ingredients.clone(),
-        tags: recipe.tags.clone(),
+    let form = RecipeForm {
+        version: state.editor.version(&recipe_path(&id)),
+        input: RecipeInput {
+            name: recipe.name.clone(),
+            ingredients: recipe.ingredients.clone(),
+            tags: recipe.tags.clone(),
+        },
+        ..RecipeForm::default()
     };
-    let version = state.editor.version(&recipe_path(&id));
-    recipe_page(&state, &catalog, &target, version, &input, Vec::new())
+    recipe_page(&state, &catalog, &target, form)
 }
 
 pub(super) async fn update_recipe(
@@ -312,26 +435,40 @@ pub(super) async fn update_recipe(
     Path(id): Path<String>,
     Form(pairs): FormPairs,
 ) -> Response {
-    let input = recipe_input(&pairs);
+    let found = state.editor.catalog().and_then(|catalog| {
+        let target = existing(&catalog, &id)?;
+        Ok((catalog, target))
+    });
+    let (catalog, target) = match found {
+        Ok(found) => found,
+        Err(error) => return message_page(&state, &error),
+    };
+    let mut input = recipe_input(&pairs);
     let version = first(&pairs, "version");
+    if let Some(notices) = edit_form(&catalog, &pairs, &mut input) {
+        let form = RecipeForm {
+            version,
+            input,
+            notices,
+            errors: Vec::new(),
+            focus_search: true,
+        };
+        return recipe_page(&state, &catalog, &target, form);
+    }
     match state.editor.update_recipe(&id, &version, &input) {
         Ok(()) => {
             state.live.reload();
             done("/catalog/recipes", "updated")
         }
         Err(error) => {
-            let page = state.editor.catalog().and_then(|catalog| {
-                let target = existing(&catalog, &id)?;
-                Ok(recipe_page(
-                    &state,
-                    &catalog,
-                    &target,
-                    version,
-                    &input,
-                    error_messages(&error),
-                ))
-            });
-            page.unwrap_or_else(|_| message_page(&state, &error))
+            let form = RecipeForm {
+                version,
+                input,
+                notices: Vec::new(),
+                errors: error_messages(&error),
+                focus_search: false,
+            };
+            recipe_page(&state, &catalog, &target, form)
         }
     }
 }
