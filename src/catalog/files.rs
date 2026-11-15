@@ -27,6 +27,9 @@ pub struct IngredientsFile {
 pub struct TagsFile {
     #[cfg_attr(test, schemars(with = "Option<Vec<String>>"))]
     pub tags: Option<Vec<Name>>,
+    /// Groups of recipe tags offered as one-choice buttons by "Que cuisiner ?".
+    #[cfg_attr(test, schemars(with = "Option<Vec<Vec<String>>>"))]
+    pub choices: Option<Vec<Vec<Name>>>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,5 +1,6 @@
 //! HTTP routes. Pages are rendered on the server; static assets are embedded in the binary.
 
+mod cook;
 mod editor;
 mod flow;
 mod menu;
@@ -36,6 +37,7 @@ pub fn router(live: Arc<LiveCatalog>) -> Router {
     Router::new()
         .route("/", get(menu::plan))
         .route("/menu", get(menu::proposal))
+        .route("/cook", get(cook::page))
         .route("/menu/accepted", get(shopping::stock_check))
         .route("/shopping-list", get(shopping::shopping_list))
         .route("/shopping-list.txt", get(shopping::shopping_list_text))

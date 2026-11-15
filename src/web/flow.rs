@@ -1,8 +1,9 @@
 //! State of the main flow as carried by query strings, shared by every page of the flow.
 //!
 //! Keys: `meals`, `tag:<name>=required|excluded`, repeated `proposed` and `rejected` recipe
-//! identifiers, repeated `in_stock` ingredient names, `with_menu=0|1`; plus the action
-//! `reject=<id>` and the notice `removed=<count>`.
+//! identifiers, repeated `in_stock` ingredient names, `with_menu=0|1`, repeated `have`
+//! ingredient names ("Que cuisiner ?" stock); plus the actions `reject=<id>` and `add=<name>`,
+//! and the notice `removed=<count>`.
 
 use crate::catalog::Catalog;
 use crate::menu::{Criteria, MAX_MEALS, Menu, TagFilter};
@@ -18,6 +19,8 @@ pub(super) struct FlowQuery {
     pub in_stock: Vec<String>,
     /// `None` until the user has made a choice.
     pub with_menu: Option<bool>,
+    pub have: Vec<String>,
+    pub add: Option<String>,
 }
 
 /// Lenient on purpose: invalid values fall back to defaults and unknown tags are ignored.
@@ -35,6 +38,8 @@ pub(super) fn parse(pairs: &[(String, String)], catalog: &Catalog) -> FlowQuery 
             "reject" => query.reject = Some(value.clone()),
             "removed" => query.removed = value.parse().unwrap_or(0),
             "in_stock" => query.in_stock.push(value.clone()),
+            "have" => query.have.push(value.clone()),
+            "add" => query.add = Some(value.clone()),
             // A hidden `0` precedes the checkbox `1`, so the last value is the user's choice.
             "with_menu" => query.with_menu = Some(value == "1"),
             _ => {
@@ -60,6 +65,12 @@ pub(super) type Fields = Vec<(String, String)>;
 
 pub(super) fn criteria_fields(criteria: &Criteria) -> Fields {
     let mut fields = vec![("meals".to_string(), criteria.meals.to_string())];
+    fields.extend(tag_fields(criteria));
+    fields
+}
+
+pub(super) fn tag_fields(criteria: &Criteria) -> Fields {
+    let mut fields = Vec::new();
     for (tag, filter) in &criteria.tags {
         let value = match filter {
             TagFilter::Required => "required",
@@ -74,6 +85,13 @@ pub(super) fn menu_fields(menu: &Menu) -> Fields {
     let mut fields = criteria_fields(&menu.criteria);
     fields.extend(repeated("proposed", &menu.proposed));
     fields.extend(repeated("rejected", &menu.rejected));
+    fields
+}
+
+/// "Que cuisiner ?" state: tag filters and stock.
+pub(super) fn cook_fields(criteria: &Criteria, have: &[String]) -> Fields {
+    let mut fields = tag_fields(criteria);
+    fields.extend(repeated("have", have));
     fields
 }
 

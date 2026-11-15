@@ -15,6 +15,7 @@ pub(super) fn validate(
 ) -> Result<Catalog, Vec<Problem>> {
     let ingredients = validate_ingredients(sources, &mut problems);
     let tags = validate_tags(sources, &mut problems);
+    let choices = validate_choices(sources, &tags, &mut problems);
 
     // Without a readable ingredients (or tags) file, every reference would be reported as
     // unknown: skip those checks, the missing file is already reported.
@@ -104,6 +105,7 @@ pub(super) fn validate(
         Ok(Catalog {
             ingredients,
             tags,
+            choices,
             recipes,
         })
     } else {
@@ -156,6 +158,44 @@ fn validate_tags(sources: &Sources, problems: &mut Vec<Problem>) -> Vec<String> 
         }
     }
     tags
+}
+
+/// Groups of `choices`: declared tags only, each one in a single group.
+fn validate_choices(
+    sources: &Sources,
+    tags: &[String],
+    problems: &mut Vec<Problem>,
+) -> Vec<Vec<String>> {
+    let Some(source) = &sources.tags else {
+        return Vec::new();
+    };
+    let mut seen = BTreeSet::new();
+    let mut choices = Vec::new();
+    for group in source.file.choices.iter().flatten() {
+        if group.is_empty() {
+            problems.push(Problem::new(&source.path, None, ProblemKind::EmptyChoice));
+            continue;
+        }
+        let mut accepted = Vec::new();
+        for name in group {
+            let value = name.value.as_str();
+            let kind = if !tags.iter().any(|tag| tag == value) {
+                let suggestion = closest(value, tags.iter().map(String::as_str));
+                ProblemKind::UnknownTag {
+                    name: value.to_string(),
+                    suggestion: suggestion.map(str::to_string),
+                }
+            } else if !seen.insert(value) {
+                ProblemKind::RepeatedChoice(value.to_string())
+            } else {
+                accepted.push(value.to_string());
+                continue;
+            };
+            problems.push(Problem::new(&source.path, position(name), kind));
+        }
+        choices.push(accepted);
+    }
+    choices
 }
 
 /// Catalog names already accepted, by normalized form.

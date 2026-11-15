@@ -21,6 +21,10 @@ The user interface is in French. The code and documentation are in English.
    or print. The list follows the order of the ingredients file, so you can group ingredients
    by shop aisle there.
 
+"Que cuisiner ?" works the other way round: say what you feel like (for example *viande*) and
+what you have in stock, and the app lists the recipes you can cook now, then, apart, those that
+miss one or two ingredients, with a shortcut to their shopping list.
+
 Recipes carry no cooking instructions, only a name, a list of ingredients and tags. Ingredients
 come from a shared catalog rather than free text, so "lait" and "du lait" can never become two
 different items.

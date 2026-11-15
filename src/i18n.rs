@@ -27,6 +27,7 @@ pub struct Messages {
     pub accepted: AcceptedMessages,
     pub stock: StockMessages,
     pub shopping: ShoppingMessages,
+    pub cook: CookMessages,
     pub editor: EditorMessages,
 }
 
@@ -47,7 +48,33 @@ pub struct LayoutMessages {
 #[serde(deny_unknown_fields)]
 pub struct NavMessages {
     pub menu: String,
+    pub cook: String,
     pub catalog: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CookMessages {
+    pub heading: String,
+    pub intro: String,
+    pub any: String,
+    pub other_criteria: String,
+    pub apply: String,
+    pub stock_heading: String,
+    pub stock_help: String,
+    pub search: String,
+    pub add: String,
+    pub remove: String,
+    pub stock_empty: String,
+    pub mapped: String,
+    pub staple: String,
+    pub unknown: String,
+    pub unknown_suggestion: String,
+    pub feasible_heading: String,
+    pub feasible_none: String,
+    pub near_heading: String,
+    pub missing: String,
+    pub shop: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,6 +225,8 @@ pub struct CatalogMessages {
     pub no_ingredients: String,
     pub duplicate_ingredient: String,
     pub duplicate_tag: String,
+    pub empty_choice: String,
+    pub repeated_choice: String,
     pub duplicate_recipe_name: String,
     pub repeated_in_recipe: String,
     pub unknown_ingredient: String,

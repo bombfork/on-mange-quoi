@@ -89,3 +89,37 @@ textarea.yaml-input {
   font-family: var(--pico-font-family-monospace);
   font-size: 0.875rem;
 }
+
+.choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.choice-group [role="button"] {
+  margin: 0;
+}
+
+article.cook-recipe.feasible {
+  border-inline-start: 0.25rem solid var(--pico-ins-color);
+}
+
+section.cook-results.near {
+  padding-top: 1rem;
+  border-top: 2px dashed var(--pico-muted-border-color);
+}
+
+article.cook-recipe.near {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-inline-start: 0.25rem solid var(--pico-del-color);
+}
+
+article.cook-recipe.near [role="button"] {
+  width: auto;
+  margin: 0;
+  white-space: nowrap;
+}

@@ -44,6 +44,8 @@ pub fn message(kind: &ProblemKind) -> String {
             &m.duplicate_tag,
             &[("name", name), ("other", other), ("line", line)],
         ),
+        ProblemKind::EmptyChoice => m.empty_choice.clone(),
+        ProblemKind::RepeatedChoice(name) => interpolate(&m.repeated_choice, &[("name", name)]),
         ProblemKind::DuplicateRecipeName { name, other } => interpolate(
             &m.duplicate_recipe_name,
             &[("name", name), ("other", &other.display())],
@@ -129,6 +131,8 @@ mod tests {
                 name: "a".into(),
                 other: "b.yml".into(),
             },
+            ProblemKind::EmptyChoice,
+            ProblemKind::RepeatedChoice("a".into()),
             ProblemKind::RepeatedInRecipe("a".into()),
             ProblemKind::UnknownIngredient {
                 name: "a".into(),

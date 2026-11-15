@@ -152,6 +152,7 @@ mod tests {
             })
             .collect();
         Catalog {
+            choices: Vec::new(),
             ingredients: Vec::new(),
             tags: vec!["rapide".into(), "végétarien".into()],
             recipes,

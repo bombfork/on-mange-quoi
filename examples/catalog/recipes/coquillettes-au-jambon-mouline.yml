@@ -5,5 +5,6 @@ recipe:
     - jambon
     - beurre
   tags:
+    - viande
     - enfants
     - rapide

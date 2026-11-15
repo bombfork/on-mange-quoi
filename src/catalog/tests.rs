@@ -429,6 +429,32 @@ fn missing_extra_file_is_reported() {
 }
 
 #[test]
+fn choices_group_declared_tags_once() {
+    let dir = catalog_dir(&[(
+        "tags.yml",
+        "tags: [enfants, rapide, cru, cuit]\nchoices:\n  - [cru, cuit]\n  - [rapide]\n",
+    )]);
+    let catalog = load(dir.path()).unwrap();
+    assert_eq!(catalog.choices, [vec!["cru", "cuit"], vec!["rapide"]]);
+
+    let kinds = load_problems(&[(
+        "tags.yml",
+        "tags: [enfants, rapide, cru]\nchoices:\n  - [cru, cuite]\n  - [cru]\n  - []\n",
+    )]);
+    assert!(
+        matches!(
+            kinds.as_slice(),
+            [
+                ProblemKind::EmptyChoice,
+                ProblemKind::UnknownTag { name, .. },
+                ProblemKind::RepeatedChoice(repeated),
+            ] if name == "cuite" && repeated == "cru"
+        ),
+        "{kinds:?}"
+    );
+}
+
+#[test]
 fn fingerprint_follows_the_files_load_reads() {
     let dir = catalog_dir(&[]);
     let base = fingerprint(dir.path());

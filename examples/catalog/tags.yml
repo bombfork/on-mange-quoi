@@ -1,4 +1,8 @@
 tags:
   - végétarien
+  - viande
+  - poisson
   - enfants
   - rapide
+choices:
+  - [végétarien, viande, poisson]

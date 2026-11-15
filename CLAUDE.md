@@ -20,8 +20,9 @@ stock with the user, and outputs a shopping list. It is self-hosted on the famil
 network.
 
 Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
-serves the whole main flow (criteria, proposal, rejection, stock check, shopping list) and the
-catalog editor. The catalog is reloaded when its files change.
+serves the whole main flow (criteria, proposal, rejection, stock check, shopping list), the
+"Que cuisiner ?" page (recipes from the stock) and the catalog editor. The catalog is reloaded
+when its files change.
 
 ## Technical decisions
 
@@ -59,6 +60,13 @@ catalog editor. The catalog is reloaded when its files change.
   only differ by spelling from a known name are imported as that name and reported. A recipe may
   only use ingredients from the catalog or declared in the input. Meant to receive the output
   of the recipe extraction skill published in `bombfork/claude-marketplace`.
+- "Que cuisiner ?" (`/cook`): one-choice buttons for each group of `choices` (plus "Peu
+  importe"), the other tags as required/ignored/excluded filters folded under "Autres
+  critères", the stock entered with the same search field as the recipe form, then the results
+  in two clearly separate sections: recipes fully in stock, and recipes missing one or two
+  ingredients (with at least one taken from the stock), each with a "Faire les courses" link to
+  the stock check of that recipe, the stock already ticked. Choices and removals are links;
+  adding is a GET form applied at render time (idempotent).
 - Edits are POST forms. POST requests from other sites are refused (`Sec-Fetch-Site`, or
   `Origin` against `Host` for browsers without it), since there is no authentication.
 - JSON Schemas for the YAML files are generated from the Rust types, for editor autocompletion.
@@ -133,6 +141,8 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
   filters), `Menu` (proposed and rejected recipe identifiers) and `Menu::update`, which drops
   recipes that left the catalog, replaces a rejected recipe in place and fills empty slots. The
   random source (`fastrand::Rng`) is a parameter, seeded in tests.
+- `src/cook.rs` - domain module of "Que cuisiner ?": `suggest` splits the recipes matching
+  the tag filters into feasible and near (`MAX_MISSING`), staples counting as in stock.
 - `src/shopping.rs` - domain module for steps 4 and 5: ingredients to check (union of the menu's
   ingredients, without staples, in catalog order) and the shopping list.
 - `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. Each request takes a
@@ -144,6 +154,8 @@ variables `RELEASER_APP_ID`, `RELEASER_APP_INSTALLATION_ID` and the secret
 - `src/web/menu.rs` - pages `/` (criteria form) and `/menu` (proposal). Actions (`reject=<id>`,
   first proposal, catalog changes) answer with a 303 redirect to the URL of the new state, so a
   reload never changes the menu.
+- `src/web/cook.rs` - page `/cook`; state in the query string (`tag:…`, repeated `have`, action
+  `add`).
 - `src/web/shopping.rs` - pages `/menu/accepted` (accepted menu and stock check),
   `/shopping-list` and `/shopping-list.txt` (plain text, to copy or print).
 - `src/web/editor.rs` - editor pages under `/catalog/` (recipes, ingredients, tags, import), shown from
@@ -221,8 +233,12 @@ staples:
 # tags.yml
 tags:
   - végétarien
+  - viande
+  - poisson
   - enfants
   - rapide
+choices:
+  - [végétarien, viande, poisson]
 ```
 
 ```yaml
@@ -253,6 +269,23 @@ Rules:
   normalizes Unicode. The editor derives it from the recipe name. Only `.yml` is accepted.
 - A recipe has a non-empty name and at least one ingredient, without duplicates. `tags` may be
   absent or empty.
+- `choices` (optional) groups tags offered as one-choice buttons by "Que cuisiner ?": declared
+  tags only, each tag in one group at most, no empty group. Renaming or deleting a tag in the
+  editor updates `choices`.
+
+### Planned: ingredient tags (step 2 of "Que cuisiner ?", design agreed)
+
+- `ingredients.yml` gains an optional `ingredient_tags` map: tag name to a list of catalog
+  ingredients (`viande rouge: [steak haché, boulettes de bœuf]`). Ingredient tags are a separate
+  namespace from recipe tags.
+- After the `choices` buttons, an "affiner" step offers the ingredient tags present in the
+  remaining candidate recipes (computed, no configuration); choosing one keeps the recipes that
+  contain an ingredient with that tag.
+- The stock step offers one-click additions: the ingredients of the chosen ingredient tag, or,
+  without one, the most frequent ingredients of the remaining recipes (about twelve).
+- Ingredient tags are edited on the ingredient page (checkboxes and a new tag field); the import
+  accepts `ingredient_tags` in ingredient documents, and the recipe-yaml skill proposes them.
+  `choices` stays edited by hand.
 
 ### Open questions
 

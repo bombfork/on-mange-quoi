@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ t.cook.heading }}</h2>
+<p>{{ t.cook.intro }}</p>
+
+{% for group in groups %}
+<div class="choice-group">
+  {% for button in group %}
+  <a href="{{ button.url }}" role="button"{% if !button.selected %} class="outline"{% endif %}>{{ button.label }}</a>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% if !other_tags.is_empty() %}
+<details{% if other_open %} open{% endif %}>
+  <summary>{{ t.cook.other_criteria }}</summary>
+  <form method="get" action="/cook">
+    {% for field in other_fields %}
+    <input type="hidden" name="{{ field.name }}" value="{{ field.value }}" />
+    {% endfor %}
+    {% for tag in other_tags %}
+    <fieldset class="tag-filter">
+      <legend>{{ tag.name }}</legend>
+      <label><input type="radio" name="tag:{{ tag.name }}" value="required"{% if tag.required %} checked{% endif %} /> {{ t.plan.required }}</label>
+      <label><input type="radio" name="tag:{{ tag.name }}" value="ignored"{% if !tag.required && !tag.excluded %} checked{% endif %} /> {{ t.plan.ignored }}</label>
+      <label><input type="radio" name="tag:{{ tag.name }}" value="excluded"{% if tag.excluded %} checked{% endif %} /> {{ t.plan.excluded }}</label>
+    </fieldset>
+    {% endfor %}
+    <button type="submit" class="secondary">{{ t.cook.apply }}</button>
+  </form>
+</details>
+{% endif %}
+
+<section>
+  <h3>{{ t.cook.stock_heading }}</h3>
+  {% for notice in notices %}
+  <p class="notice">{{ notice }}</p>
+  {% endfor %}
+  <form method="get" action="/cook">
+    {% for field in state_fields %}
+    <input type="hidden" name="{{ field.name }}" value="{{ field.value }}" />
+    {% endfor %}
+    <fieldset role="group">
+      <input type="search" name="add" list="cook-ingredients" autocomplete="off"
+             placeholder="{{ t.cook.search }}" aria-label="{{ t.cook.search }}"{% if focus_search %} autofocus{% endif %} />
+      <button type="submit">{{ t.cook.add }}</button>
+    </fieldset>
+    <datalist id="cook-ingredients">
+      {% for name in all_ingredients %}
+      <option value="{{ name }}"></option>
+      {% endfor %}
+    </datalist>
+  </form>
+  {% if stock.is_empty() %}
+  <p><small>{{ t.cook.stock_empty }}</small></p>
+  {% else %}
+  <ul class="selected-ingredients">
+    {% for item in stock %}
+    <li><span>{{ item.name }}</span><a href="{{ item.remove_url }}" role="button" class="secondary outline">{{ t.cook.remove }}</a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <p><small>{{ t.cook.stock_help }}</small></p>
+</section>
+
+<section class="cook-results">
+  <h3>{{ t.cook.feasible_heading }}</h3>
+  {% if feasible.is_empty() %}
+  <p>{{ t.cook.feasible_none }}</p>
+  {% else %}
+  {% for recipe in feasible %}
+  <article class="cook-recipe feasible">
+    <strong>{{ recipe.name }}</strong><br />
+    <small>{{ recipe.ingredients }}</small>
+  </article>
+  {% endfor %}
+  {% endif %}
+</section>
+
+{% if !near.is_empty() %}
+<section class="cook-results near">
+  <h3>{{ t.cook.near_heading }}</h3>
+  {% for recipe in near %}
+  <article class="cook-recipe near">
+    <div>
+      <strong>{{ recipe.name }}</strong><br />
+      <mark>{{ recipe.missing }}</mark><br />
+      <small>{{ recipe.ingredients }}</small>
+    </div>
+    <a href="{{ recipe.shop_url }}" role="button" class="outline">{{ t.cook.shop }}</a>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

@@ -30,6 +30,8 @@ const EXTENSION: &str = "yml";
 pub struct Catalog {
     pub ingredients: Vec<Ingredient>,
     pub tags: Vec<String>,
+    /// Groups of tags, each one offered as a single choice ("cru" or "cuit").
+    pub choices: Vec<Vec<String>>,
     pub recipes: Vec<Recipe>,
 }
 
@@ -47,6 +49,22 @@ pub struct Recipe {
     pub name: String,
     pub ingredients: Vec<String>,
     pub tags: Vec<String>,
+}
+
+impl Catalog {
+    /// The catalog ingredient `typed` stands for: same name, or same name after normalization.
+    pub fn ingredient(&self, typed: &str) -> Option<&Ingredient> {
+        let typed = typed.trim();
+        self.ingredients
+            .iter()
+            .find(|ingredient| ingredient.name == typed)
+            .or_else(|| {
+                let key = normalize::normalize(typed);
+                self.ingredients
+                    .iter()
+                    .find(|ingredient| normalize::normalize(&ingredient.name) == key)
+            })
+    }
 }
 
 /// 1-indexed position in a YAML file.
@@ -90,6 +108,10 @@ pub enum ProblemKind {
         other: String,
         line: u64,
     },
+    /// A group of `choices` without any tag.
+    EmptyChoice,
+    /// A tag listed more than once in `choices`.
+    RepeatedChoice(String),
     DuplicateRecipeName {
         name: String,
         other: PathBuf,

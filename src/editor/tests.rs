@@ -106,7 +106,14 @@ fn writes_the_documented_layout() {
         "ingredients:\n  - lait\nstaples:\n  - sel\n"
     );
     assert_eq!(ingredients_yaml(&[], &[]), "ingredients: []\n");
-    assert_eq!(tags_yaml(&[]), "tags: []\n");
+    assert_eq!(tags_yaml(&[], &[]), "tags: []\n");
+    assert_eq!(
+        tags_yaml(
+            &["cru".into(), "cuit".into(), "viande rouge".into()],
+            &[vec!["cru".into(), "cuit".into()]]
+        ),
+        "tags:\n  - cru\n  - cuit\n  - viande rouge\nchoices:\n  - [cru, cuit]\n"
+    );
 }
 
 #[test]
@@ -330,13 +337,23 @@ fn tags_can_be_added_renamed_and_deleted() {
     editor.add_tag(&version(), "hiver").unwrap();
     editor.update_tag(&version(), "rapide", "express").unwrap();
     let catalog = editor.catalog().unwrap();
-    assert_eq!(catalog.tags, ["végétarien", "enfants", "express", "hiver"]);
+    assert_eq!(
+        catalog.tags,
+        [
+            "végétarien",
+            "viande",
+            "poisson",
+            "enfants",
+            "express",
+            "hiver"
+        ]
+    );
     let croque = catalog
         .recipes
         .iter()
         .find(|r| r.id == "croque-monsieur")
         .unwrap();
-    assert_eq!(croque.tags, ["enfants", "express"]);
+    assert_eq!(croque.tags, ["viande", "enfants", "express"]);
 
     assert!(matches!(
         editor.delete_tag(&version(), "express"),
@@ -347,6 +364,23 @@ fn tags_can_be_added_renamed_and_deleted() {
         editor.add_tag(&version(), "Enfant"),
         Err(EditError::Invalid(_))
     ));
+}
+
+#[test]
+fn tag_changes_keep_choices_in_sync() {
+    let dir = example_copy();
+    let editor = editor(&dir);
+    let version = || editor.version(Path::new(TAGS_FILE));
+    editor.add_tag(&version(), "hiver").unwrap();
+    editor
+        .update_tag(&version(), "poisson", "poissons")
+        .unwrap();
+    editor.delete_tag(&version(), "poissons").unwrap();
+    assert_eq!(
+        editor.catalog().unwrap().choices,
+        [vec!["végétarien", "viande"]]
+    );
+    assert!(read(&dir, TAGS_FILE).ends_with("choices:\n  - [végétarien, viande]\n"));
 }
 
 #[test]

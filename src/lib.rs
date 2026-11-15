@@ -1,4 +1,5 @@
 pub mod catalog;
+pub mod cook;
 pub mod editor;
 pub mod i18n;
 pub mod live;

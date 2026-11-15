@@ -132,6 +132,7 @@ mod tests {
 
     fn catalog() -> Catalog {
         Catalog {
+            choices: Vec::new(),
             ingredients: Vec::new(),
             tags: vec!["rapide".into(), "enfants".into(), "végétarien".into()],
             recipes: vec![

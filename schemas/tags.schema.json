@@ -3,6 +3,19 @@
   "title": "TagsFile",
   "type": "object",
   "properties": {
+    "choices": {
+      "description": "Groups of recipe tags offered as one-choice buttons by \"Que cuisiner ?\".",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
     "tags": {
       "type": [
         "array",

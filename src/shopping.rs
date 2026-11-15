@@ -53,6 +53,7 @@ mod tests {
             tags: Vec::new(),
         };
         Catalog {
+            choices: Vec::new(),
             ingredients: vec![
                 ingredient("lait", false),
                 ingredient("œufs", false),

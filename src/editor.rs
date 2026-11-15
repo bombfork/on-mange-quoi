@@ -238,33 +238,35 @@ impl Editor {
             &[(&path, version)],
             vec![Change {
                 path: path.clone(),
-                content: Some(tags_yaml(&tags)),
+                content: Some(tags_yaml(&tags, &catalog.choices)),
             }],
         )
     }
 
-    /// Renames a tag, in every recipe that uses it too.
+    /// Renames a tag, in `choices` and in every recipe that uses it too.
     pub fn update_tag(&self, version: &str, old: &str, new: &str) -> Result<(), EditError> {
         let _guard = self.lock();
         let catalog = self.catalog()?;
         if !catalog.tags.iter().any(|tag| tag == old) {
             return Err(EditError::NotFound);
         }
-        let tags: Vec<String> = catalog
-            .tags
+        let rename = |tag: &String| {
+            if tag == old {
+                new.to_string()
+            } else {
+                tag.clone()
+            }
+        };
+        let tags: Vec<String> = catalog.tags.iter().map(rename).collect();
+        let choices: Vec<Vec<String>> = catalog
+            .choices
             .iter()
-            .map(|tag| {
-                if tag == old {
-                    new.to_string()
-                } else {
-                    tag.clone()
-                }
-            })
+            .map(|group| group.iter().map(rename).collect())
             .collect();
         let path = PathBuf::from(TAGS_FILE);
         let mut changes = vec![Change {
             path: path.clone(),
-            content: Some(tags_yaml(&tags)),
+            content: Some(tags_yaml(&tags, &choices)),
         }];
         if old != new {
             changes.extend(rename_in_recipes(&catalog, old, new, |recipe| {
@@ -274,6 +276,7 @@ impl Editor {
         self.apply(&[(&path, version)], changes)
     }
 
+    /// Deletes a tag that no recipe uses, removing it from `choices` too.
     pub fn delete_tag(&self, version: &str, name: &str) -> Result<(), EditError> {
         let _guard = self.lock();
         let catalog = self.catalog()?;
@@ -290,12 +293,18 @@ impl Editor {
             .filter(|t| *t != name)
             .cloned()
             .collect();
+        let choices: Vec<Vec<String>> = catalog
+            .choices
+            .iter()
+            .map(|group| group.iter().filter(|t| *t != name).cloned().collect())
+            .filter(|group: &Vec<String>| !group.is_empty())
+            .collect();
         let path = PathBuf::from(TAGS_FILE);
         self.apply(
             &[(&path, version)],
             vec![Change {
                 path: path.clone(),
-                content: Some(tags_yaml(&tags)),
+                content: Some(tags_yaml(&tags, &choices)),
             }],
         )
     }
@@ -537,12 +546,19 @@ pub fn ingredients_yaml(ingredients: &[String], staples: &[String]) -> String {
     yaml
 }
 
-pub fn tags_yaml(tags: &[String]) -> String {
-    if tags.is_empty() {
-        return "tags: []\n".to_string();
-    }
+pub fn tags_yaml(tags: &[String], choices: &[Vec<String>]) -> String {
     let mut yaml = String::new();
+    if tags.is_empty() {
+        yaml.push_str("tags: []\n");
+    }
     write_list(&mut yaml, "", "tags", tags);
+    if !choices.is_empty() {
+        yaml.push_str("choices:\n");
+        for group in choices {
+            let items: Vec<String> = group.iter().map(|tag| scalar(tag)).collect();
+            let _ = writeln!(yaml, "  - [{}]", items.join(", "));
+        }
+    }
     yaml
 }
 

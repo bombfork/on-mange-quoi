@@ -7,7 +7,8 @@
     "catalog_errors": "Le catalogue modifié contient des erreurs\u00a0: la version précédente reste utilisée."
   },
   "nav": {
-    "menu": "Préparer un menu",
+    "menu": "Faire les courses",
+    "cook": "Que cuisiner\u202f?",
     "catalog": "Catalogue"
   },
   "landing": {
@@ -42,6 +43,8 @@
     "no_ingredients": "la recette n’a aucun ingrédient",
     "duplicate_ingredient": "ingrédient en double\u00a0: «\u00a0{name}\u00a0», déjà présent sous la forme «\u00a0{other}\u00a0» (ligne {line})",
     "duplicate_tag": "tag en double\u00a0: «\u00a0{name}\u00a0», déjà présent sous la forme «\u00a0{other}\u00a0» (ligne {line})",
+    "empty_choice": "groupe de choix vide",
+    "repeated_choice": "tag présent plusieurs fois dans les choix\u00a0: «\u00a0{name}\u00a0»",
     "duplicate_recipe_name": "nom de recette en double\u00a0: «\u00a0{name}\u00a0», déjà utilisé par {other}",
     "repeated_in_recipe": "«\u00a0{name}\u00a0» apparaît plusieurs fois dans la recette",
     "unknown_ingredient": "ingrédient inconnu\u00a0: «\u00a0{name}\u00a0»",
@@ -87,6 +90,28 @@
     "text_version": "Version texte (à copier ou imprimer)",
     "edit_stock": "Modifier le stock",
     "new_menu": "Préparer un autre menu"
+  },
+  "cook": {
+    "heading": "Que cuisiner\u202f?",
+    "intro": "Choisir ce qui fait envie, indiquer ce qui est en stock\u00a0: l’application propose les recettes réalisables.",
+    "any": "Peu importe",
+    "other_criteria": "Autres critères",
+    "apply": "Appliquer",
+    "stock_heading": "En stock",
+    "stock_help": "Les produits de base comptent toujours comme en stock.",
+    "search": "Ajouter un ingrédient en stock",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "stock_empty": "Aucun ingrédient en stock pour l’instant.",
+    "mapped": "«\u00a0{typed}\u00a0» ajouté sous la forme «\u00a0{name}\u00a0».",
+    "staple": "«\u00a0{name}\u00a0» est un produit de base, toujours compté en stock.",
+    "unknown": "«\u00a0{typed}\u00a0» n’est pas au catalogue.",
+    "unknown_suggestion": "«\u00a0{typed}\u00a0» n’est pas au catalogue, vouliez-vous dire «\u00a0{name}\u00a0»\u202f?",
+    "feasible_heading": "Réalisables avec le stock",
+    "feasible_none": "Aucune recette réalisable avec ce stock.",
+    "near_heading": "Il manque un ou deux ingrédients",
+    "missing": "Il manque\u00a0: {ingredients}",
+    "shop": "Faire les courses"
   },
   "editor": {
     "recipes": "Recettes",
