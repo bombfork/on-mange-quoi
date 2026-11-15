@@ -25,6 +25,23 @@ Recipes carry no cooking instructions, only a name, a list of ingredients and ta
 come from a shared catalog rather than free text, so "lait" and "du lait" can never become two
 different items.
 
+## Installation
+
+Download the binary for your machine from the
+[latest release](https://github.com/bombfork/on-mange-quoi/releases/latest):
+`on-mange-quoi-x86_64-unknown-linux-musl` for a PC or most servers,
+`on-mange-quoi-aarch64-unknown-linux-musl` for a Raspberry Pi 3, 4 or 5 running a 64-bit system.
+The binaries are statically linked and run on any Linux distribution.
+
+```bash
+base=https://github.com/bombfork/on-mange-quoi/releases/latest/download
+curl -LO "$base/on-mange-quoi-x86_64-unknown-linux-musl" -LO "$base/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS
+install -m 755 on-mange-quoi-x86_64-unknown-linux-musl ~/.local/bin/on-mange-quoi
+```
+
+To start with a catalog, copy [`examples/catalog`](examples/catalog) and adapt it.
+
 ## Usage
 
 On mange quoi ? is a single binary that serves a catalog directory of YAML files:

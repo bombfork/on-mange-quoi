@@ -30,3 +30,6 @@ http-body-util = "0.1"
 predicates = "3"
 schemars = "1"
 tower = { version = "0.5", features = ["util"] }
+
+[profile.release]
+strip = true

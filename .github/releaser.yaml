@@ -1,0 +1,33 @@
+adapter:
+  type: generic
+  build:
+    command: |
+      set -eu
+      cargo install cross --git https://github.com/cross-rs/cross
+      mkdir -p dist
+      for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+        cross build --release --target "$target"
+        cp "target/$target/release/on-mange-quoi" "dist/on-mange-quoi-$target"
+      done
+      (cd dist && sha256sum on-mange-quoi-* > SHA256SUMS)
+    artifacts:
+      - dist/on-mange-quoi-x86_64-unknown-linux-musl
+      - dist/on-mange-quoi-aarch64-unknown-linux-musl
+      - dist/SHA256SUMS
+  setup_steps:
+    - |
+      - uses: jdx/mise-action@v2
+  version:
+    locations:
+      - path: Cargo.toml
+        regex: '^version = "(.*)"$'
+      - path: Cargo.lock
+        regex: 'name = "on-mange-quoi"\nversion = "(.*)"'
+release:
+  default_branch: main
+  auth:
+    mode: github_app
+    app:
+      app_id_var: RELEASER_APP_ID
+      installation_id_var: RELEASER_APP_INSTALLATION_ID
+      private_key_secret: RELEASER_APP_PRIVATE_KEY

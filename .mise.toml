@@ -1,6 +1,7 @@
 [tools]
 rust = "stable"
 "cargo:cargo-edit" = "latest"
+"github:bombfork/releaser" = "latest"
 
 [tasks.dev]
 description = "Serve a copy of the example catalog (target/dev-catalog) on http://localhost:8080"
@@ -45,3 +46,10 @@ depends = ["fmt:check", "lint:check", "build", "test"]
 description = "Regenerate the JSON Schemas of the catalog files in schemas/"
 run = "cargo test --lib schemas_are_up_to_date"
 env = { UPDATE_SCHEMAS = "1" }
+
+[tasks.release]
+description = "Releases are automated via releaser (merge the releaser/pending-release PR)"
+run = '''
+echo "Releases are automated: merge the 'releaser/pending-release' PR on GitHub."
+echo "Preview the next release locally with: releaser release --dry-run"
+'''
