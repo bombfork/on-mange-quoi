@@ -41,5 +41,28 @@
     "did_you_mean": ", vouliez-vous dire «\u00a0{name}\u00a0»\u202f?",
     "ingredient_in_use": "ingrédient retiré mais encore utilisé\u00a0: «\u00a0{name}\u00a0» (recettes\u00a0: {recipes})",
     "tag_in_use": "tag retiré mais encore utilisé\u00a0: «\u00a0{name}\u00a0» (recettes\u00a0: {recipes})"
+  },
+  "plan": {
+    "heading": "Préparer un menu",
+    "meals": "Nombre de repas",
+    "tags_help": "Pour chaque tag, choisir s’il est requis, indifférent ou exclu.",
+    "required": "Requis",
+    "ignored": "Indifférent",
+    "excluded": "Exclu",
+    "submit": "Proposer un menu"
+  },
+  "menu": {
+    "heading": "Menu proposé",
+    "help": "Changer les recettes qui ne conviennent pas, puis valider le menu.",
+    "change": "Changer",
+    "accept": "Valider le menu",
+    "edit_criteria": "Modifier les critères",
+    "missing": "Pas assez de recettes correspondant aux critères\u00a0: il en manque {count}.",
+    "none": "Aucune recette ne correspond aux critères.",
+    "removed": "Recettes retirées du catalogue depuis la proposition, donc enlevées du menu\u00a0: {count}."
+  },
+  "accepted": {
+    "heading": "Menu validé",
+    "edit": "Modifier le menu"
   }
 }

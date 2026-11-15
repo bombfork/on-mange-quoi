@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ t.accepted.heading }}</h2>
+<ul>
+  {% for recipe in recipes %}
+  <li><strong>{{ recipe.name }}</strong><br /><small>{{ recipe.ingredients }}</small></li>
+  {% endfor %}
+</ul>
+<p><a href="/menu?{{ menu_query }}">{{ t.accepted.edit }}</a></p>
+{% endblock %}

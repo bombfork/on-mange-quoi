@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <p>{{ t.landing.intro }}</p>
+  <p>{{ catalog_summary }}</p>
+</section>
+
+<form method="get" action="/menu">
+  <h2>{{ t.plan.heading }}</h2>
+  <label>
+    {{ t.plan.meals }}
+    <input type="number" name="meals" min="1" max="{{ max_meals }}" value="{{ meals }}" required />
+  </label>
+  {% if !tags.is_empty() %}
+  <p>{{ t.plan.tags_help }}</p>
+  {% for tag in tags %}
+  <fieldset class="tag-filter">
+    <legend>{{ tag.name }}</legend>
+    <label><input type="radio" name="tag:{{ tag.name }}" value="required"{% if tag.required %} checked{% endif %} /> {{ t.plan.required }}</label>
+    <label><input type="radio" name="tag:{{ tag.name }}" value="ignored"{% if !tag.required && !tag.excluded %} checked{% endif %} /> {{ t.plan.ignored }}</label>
+    <label><input type="radio" name="tag:{{ tag.name }}" value="excluded"{% if tag.excluded %} checked{% endif %} /> {{ t.plan.excluded }}</label>
+  </fieldset>
+  {% endfor %}
+  {% endif %}
+  <button type="submit">{{ t.plan.submit }}</button>
+</form>
+
+<p><small>{{ t.landing.status }}</small></p>
+{% endblock %}

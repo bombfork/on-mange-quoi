@@ -6,8 +6,8 @@ the shopping list.
 
 The user interface is in French. The code and documentation are in English.
 
-> **Status:** early development. The catalog is loaded and validated; the meal planning flow
-> itself is not implemented yet.
+> **Status:** early development. Menus can be proposed and adjusted; the stock check and the
+> shopping list are not implemented yet.
 
 ## How it is meant to work
 

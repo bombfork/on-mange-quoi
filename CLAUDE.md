@@ -20,8 +20,8 @@ stock with the user, and outputs a shopping list. It is self-hosted on the famil
 network.
 
 Current state: the binary loads and validates the catalog (at startup and with `--validate`) and
-serves a landing page. The main flow (menu proposal, stock check, shopping list) is not
-implemented yet.
+serves the main flow up to the accepted menu (criteria, proposal, rejection). The stock check and
+the shopping list are not implemented yet.
 
 ## Technical decisions
 
@@ -82,8 +82,16 @@ Always use mise tasks, not `cargo` directly.
   - `tests.rs` - one test per rule, on temporary catalog directories.
 - `src/report.rs` - renders problems in French as `path:line:column : message`. Structural errors
   (unknown key, wrong type) embed the parser's English message.
-- `src/web.rs` - axum routes; renders askama templates and serves the embedded stylesheets.
-  The loaded catalog is shared through the router state.
+- `src/menu.rs` - domain module for steps 1 to 3 of the main flow: `Criteria` (meal count, tag
+  filters), `Menu` (proposed and rejected recipe identifiers) and `Menu::update`, which drops
+  recipes that left the catalog, replaces a rejected recipe in place and fills empty slots. The
+  random source (`fastrand::Rng`) is a parameter, seeded in tests.
+- `src/web/mod.rs` - axum router, embedded stylesheets, template rendering. The loaded catalog
+  is shared through the router state.
+- `src/web/menu.rs` - pages `/` (criteria form), `/menu` (proposal) and `/menu/accepted`. The
+  flow state is in the query string (`meals`, `tag:<name>=required|excluded`, repeated `proposed`
+  and `rejected`); actions (`reject=<id>`, first proposal, catalog changes) answer with a 303
+  redirect to the URL of the new state, so a reload never changes the menu.
 - `src/i18n.rs` - `locales/fr.json` is embedded and deserialized into the `Messages` struct
   (`deny_unknown_fields`), so templates reference keys as fields checked at compile time.
   `interpolate()` fills `{name}` placeholders. Tests enforce French typography in the locale.

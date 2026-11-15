@@ -20,6 +20,9 @@ pub struct Messages {
     pub landing: LandingMessages,
     pub cli: CliMessages,
     pub catalog: CatalogMessages,
+    pub plan: PlanMessages,
+    pub menu: MenuMessages,
+    pub accepted: AcceptedMessages,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,6 +54,38 @@ pub struct CliMessages {
     pub catalog_loaded: String,
     pub catalog_valid: String,
     pub catalog_invalid: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanMessages {
+    pub heading: String,
+    pub meals: String,
+    pub tags_help: String,
+    pub required: String,
+    pub ignored: String,
+    pub excluded: String,
+    pub submit: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MenuMessages {
+    pub heading: String,
+    pub help: String,
+    pub change: String,
+    pub accept: String,
+    pub edit_criteria: String,
+    pub missing: String,
+    pub none: String,
+    pub removed: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AcceptedMessages {
+    pub heading: String,
+    pub edit: String,
 }
 
 /// Catalog problems, rendered by `report::describe`.
